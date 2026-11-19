@@ -24,9 +24,10 @@
   .w img{width:100%;height:auto;display:block;background:#f3f3f1;transition:opacity .35s}
   .w figcaption{display:flex;justify-content:space-between;gap:1em;padding-top:8px;opacity:0;transform:translateY(-3px);transition:opacity .3s,transform .3s}
   .w figcaption i{font-style:normal;color:var(--mute)}
-  main:hover .w img{opacity:.35}
-  main .w:hover img{opacity:1}
-  .w:hover figcaption,.w:focus-visible figcaption{opacity:1;transform:none}
+  /* 淡化只在滑鼠真的停在作品上時出現；返回頁面時會自動清除 */
+  main.dim .w img{opacity:.35}
+  main.dim .w.on img{opacity:1}
+  .w.on figcaption,.w:focus-visible figcaption{opacity:1;transform:none}
 
   /* 每件作品的位置（桌機） */
   .a{--c:2; --s:7; --r:1}
@@ -38,6 +39,17 @@
   .h{--c:13;--s:11;--r:4;--t:5vw}
   .w{grid-row:var(--r)}
 
+
+  /* 關於 / 聯絡 */
+  #info{display:grid;grid-template-columns:repeat(24,1fr);column-gap:1.6vw;padding:6vw 2.4vw 10vw;border-top:1px solid #eee;scroll-margin-top:40px}
+  #info h2{grid-column:2/span 5;font-size:12px;font-weight:400;text-transform:uppercase;color:var(--mute)}
+  #info .bio{grid-column:8/span 9;font-size:15px;line-height:1.8;letter-spacing:.02em}
+  #info .bio p+p{margin-top:.6em;color:#555;font-size:13px}
+  #info dl{grid-column:19/span 5;font-size:12px;line-height:2.1}
+  #info dt{color:var(--mute);text-transform:uppercase}
+  #info dd{margin-bottom:1.2em}
+  #info a{border-bottom:1px solid #ccc;transition:border-color .2s}
+  #info a:hover{border-color:var(--ink)}
   footer{padding:0 2.4vw 3vh;color:var(--mute);text-transform:uppercase;display:flex;justify-content:space-between}
 
   /* 手機：單欄，左右交錯，說明常駐 */
@@ -49,8 +61,10 @@
     .w{grid-row:auto;margin-top:0}
     .a{--c:1;--s:10}.b{--c:5;--s:8}.d{--c:1;--s:8}.e{--c:6;--s:7}.f{--c:1;--s:9}.g{--c:4;--s:9}.h{--c:1;--s:12}
     .w figcaption{opacity:1;transform:none}
-    main:hover .w img{opacity:1}
+    main.dim .w img{opacity:1}
     footer{padding:0 16px 24px}
+    #info{grid-template-columns:1fr;row-gap:28px;padding:56px 16px 64px}
+    #info h2,#info .bio,#info dl{grid-column:1}
   }
 </style>
 </head>
@@ -59,7 +73,7 @@
   <span>Roubert</span>
   <span>Tools (07)</span>
   <span>Browser-based visual experiments</span>
-  <span>2026</span>
+  <span><a href="#info">Info</a></span>
 </nav>
 
 <main>
@@ -85,6 +99,31 @@
     <figcaption><span>字網　Glyph Web</span><i>字母連線</i></figcaption></figure></a>
 </main>
 
+<section id="info">
+  <h2>About</h2>
+  <div class="bio">
+    <p>早期以生物繪圖為創作方向，同時投入表演藝術工作領域，在過程中找尋新的創作媒材。<br>作品主要從物件的質地與紋路出發，思索在流動的意象之中如何被轉化，並探索物件與空間的關係如何被形塑。作品見於藝術、平面設計、表演藝術領域。</p>
+    <p>Roubert began with biological illustration while also working in the performing arts, searching for new creative media along the way. His work starts from the texture and grain of objects — considering how they are transformed within fluid imagery, and exploring how the relationship between object and space takes shape. His work spans art, graphic design and the performing arts.</p>
+  </div>
+  <dl>
+    <dt>Email</dt><dd><a href="mailto:stickrobertlin@gmail.com">stickrobertlin@gmail.com</a></dd>
+  </dl>
+</section>
+
 <footer><span>© Roubert</span><span>Best in desktop Chrome</span></footer>
+<script>
+(function(){
+  var main=document.querySelector('main'), works=main.querySelectorAll('.w');
+  var fine=window.matchMedia('(hover:hover) and (pointer:fine)');
+  function clear(){main.classList.remove('dim');works.forEach(function(w){w.classList.remove('on')});}
+  works.forEach(function(w){
+    w.addEventListener('pointerenter',function(e){if(e.pointerType!=='mouse'||!fine.matches)return;clear();main.classList.add('dim');w.classList.add('on');});
+    w.addEventListener('pointerleave',clear);
+  });
+  window.addEventListener('pageshow',clear);   // 從工具頁按返回時，恢復全亮
+  window.addEventListener('pagehide',clear);
+  document.addEventListener('visibilitychange',clear);
+})();
+</script>
 </body>
 </html>
