@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roubert — Tools</title>
+<meta name="description" content="Roubert 的視覺實驗工具：網格、字形、拼貼、熱像，打開瀏覽器就能用。">
+<style>
+  :root{--ink:#111;--mute:#8a8a8a;--line:#e6e6e6;--bg:#fafaf8}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Helvetica Neue",Helvetica,"PingFang TC","Noto Sans TC",sans-serif;-webkit-font-smoothing:antialiased}
+  header{padding:9vh 5vw 7vh;display:flex;justify-content:space-between;align-items:flex-end;gap:2rem;flex-wrap:wrap}
+  h1{font-size:clamp(28px,4vw,52px);font-weight:500;letter-spacing:-.02em;line-height:1}
+  header p{font-size:13px;color:var(--mute);line-height:1.7;max-width:26em}
+  main{padding:0 5vw 12vh;display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6vh 3vw}
+  a.card{color:inherit;text-decoration:none;display:block}
+  .img{aspect-ratio:4/3;background:#eee;overflow:hidden;position:relative}
+  .img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s cubic-bezier(.2,.7,.2,1),filter .6s}
+  a.card:hover .img img{transform:scale(1.03)}
+  .txt{display:flex;align-items:center;justify-content:center;height:100%;font-size:42px;font-weight:300;letter-spacing:.08em;color:#bbb;background:repeating-linear-gradient(90deg,#f0f0ee 0 14px,#e8e8e5 14px 15px)}
+  .meta{display:flex;justify-content:space-between;align-items:baseline;padding-top:14px;border-top:1px solid var(--line);margin-top:14px;gap:1rem}
+  .meta b{font-weight:500;font-size:15px}
+  .meta span{font-size:11px;color:var(--mute);letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+  .desc{font-size:12.5px;color:#555;line-height:1.7;margin-top:6px}
+  footer{padding:0 5vw 6vh;font-size:11px;color:var(--mute);letter-spacing:.06em}
+</style>
+</head>
+<body>
+<header>
+  <h1>Roubert<br>Tools</h1>
+  <p>視覺實驗工具，打開瀏覽器就能用，不用安裝。建議使用電腦版 Chrome。<br>Visual experiment tools that run in the browser.</p>
+</header>
+<main>
+  <a class="card" href="ci-ge/"><div class="img"><img src="covers/ci-ge.jpg" alt="磁格" loading="lazy"></div>
+    <div class="meta"><b>磁格</b><span>Magnet Grid</span></div>
+    <p class="desc">把圖切成網格，用游標當磁鐵推開或吸聚格線。</p></a>
+  <a class="card" href="zhuo-zi/"><div class="img"><img src="covers/zhuo-zi.jpg" alt="灼字" loading="lazy"></div>
+    <div class="meta"><b>灼字</b><span>Burnt Glyph</span></div>
+    <p class="desc">把文字燒成熱像儀般的海報，可輸出圖片與影片。</p></a>
+  <a class="card" href="zi-dao/"><div class="img"><img src="covers/zi-dao.jpg" alt="字島" loading="lazy"></div>
+    <div class="meta"><b>字島</b><span>Glyph Island</span></div>
+    <p class="desc">畫一座島，讓一串文字首尾相接剛好繞它一圈。</p></a>
+  <a class="card" href="zi-wang/"><div class="img"><img src="covers/zi-wang.jpg" alt="字網" loading="lazy"></div>
+    <div class="meta"><b>字網</b><span>Glyph Web</span></div>
+    <p class="desc">辨識一頁文字裡相同的字母，用線把它們連起來。</p></a>
+  <a class="card" href="nie-kan-kan/"><div class="img"><img src="covers/nie-kan-kan.jpg" alt="捏看看" loading="lazy"></div>
+    <div class="meta"><b>捏看看</b><span>Face Warp</span></div>
+    <p class="desc">拖曳捏塑影像，做出變形與動態。</p></a>
+  <a class="card" href="isolate/"><div class="img"><img src="covers/isolate.jpg" alt="線稿隔離器" loading="lazy"></div>
+    <div class="meta"><b>線稿隔離器</b><span>Isolate</span></div>
+    <p class="desc">拖曳作畫，以中心點生成隔離的線稿構成。</p></a>
+  <a class="card" href="slice-collage-lab/"><div class="img"><div class="txt">切 / 片</div></div>
+    <div class="meta"><b>切片拼貼實驗模組</b><span>Slice Collage Lab</span></div>
+    <p class="desc">切片、重組、拼貼，可輸出 PNG、SVG、PSD。</p></a>
+</main>
+<footer>© Roubert</footer>
+</body>
+</html>

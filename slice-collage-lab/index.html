@@ -1,0 +1,1570 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+<title>切片拼貼實驗模組</title>
+<style>
+@font-face{font-family:'Instrument Sans';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/instrument-sans-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Sans';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/instrument-sans-latin-500-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Sans';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/instrument-sans-latin-600-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Sans';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/instrument-sans-latin-700-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Serif';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/instrument-serif-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'Instrument Serif';font-style:italic;font-weight:400;font-display:swap;src:url('fonts/instrument-serif-latin-400-italic.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/jetbrains-mono-latin-500-normal.woff2') format('woff2')}
+</style>
+<style>
+/* Layout: print-shop light table — header rail, white sheet on a pale bench, hairline inspector on the right, status strip below. Single deliberate light look. */
+:root{
+  color-scheme: light;
+  --bench:#f3f3f1;
+  --sheet:#ffffff;
+  --ink:#43423f;
+  --ink-2:#7a7973;
+  --ink-3:#abaaa4;
+  --hair:#e3e2de;
+  --wash:#f5f5f3;
+  --accent:#ff3d9a;
+  --accent-soft:#ffe3f0;
+  --f-ui:"Instrument Sans","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+  --f-tc:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+[hidden]{display:none!important}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--sheet);color:var(--ink);font-family:var(--f-ui);font-size:13px;padding-inline:16px;padding-block:12px}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 284px;grid-template-rows:auto minmax(0,1fr) auto;
+  grid-template-areas:"top top" "stage panel" "status panel";column-gap:0}
+
+/* top rail */
+.top{grid-area:top;display:flex;align-items:center;gap:16px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{margin:0;font-family:var(--f-tc);font-weight:400;font-size:21px;letter-spacing:.12em;line-height:1}
+.brand .mark{width:12px;height:12px;background:var(--accent);border-radius:50%;align-self:center}
+.brand small{font-family:var(--f-mono);font-size:10.5px;color:var(--ink-3);letter-spacing:.06em}
+.doc{flex:1;min-width:0;font-family:var(--f-mono);font-size:11px;color:var(--ink-2);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top .actions{display:flex;gap:6px;align-items:center}
+
+/* stage */
+.stage{grid-area:stage;position:relative;min-height:0;min-width:0;background:var(--bench);touch-action:none;margin-top:12px}
+.stage canvas{display:block;cursor:none}
+.stage.drop::after{content:"放開以載入圖片";position:absolute;inset:12px;border:1.5px dashed var(--accent);display:grid;place-items:center;font-family:var(--f-tc);font-weight:400;color:var(--accent);background:rgba(255,255,255,.6)}
+.gridpill{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.92);border:1px solid var(--hair);color:var(--ink-2);font:400 11.5px var(--f-tc);padding:5px 10px 5px 8px;border-radius:999px;cursor:pointer}
+.gridpill:hover{border-color:var(--ink-3);color:var(--ink)}
+.gridpill .ico{width:12px;height:12px;background-image:linear-gradient(currentColor 1px,transparent 1px),linear-gradient(90deg,currentColor 1px,transparent 1px);background-size:4px 4px;border:1px solid currentColor;opacity:.55}
+.gridpill[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.gridpill[aria-pressed="true"] .ico{opacity:1}
+.tabs.dim{opacity:.35}
+.sub{background:var(--wash);border-radius:5px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:9px;position:relative}
+.pen #penCv{width:100%;aspect-ratio:1;background:#fff;border:1px solid var(--hair);border-radius:4px;cursor:crosshair;touch-action:none;display:block}
+.pen #penCv:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shapeLib{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.shapeLib .slot{position:relative;padding:0;border:1px solid var(--hair);background:#fff;border-radius:3px;aspect-ratio:1;cursor:pointer}
+.shapeLib .slot:hover{border-color:var(--ink-3)}
+.shapeLib .slot.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.shapeLib canvas{display:block;width:100%;height:100%}
+.shapeLib .empty{grid-column:1/-1;border:1px dashed var(--hair);border-radius:4px;color:var(--ink-3);font:11.5px/1.5 var(--f-tc);padding:10px;text-align:center;background:#fff}
+.btn.small{padding:3px 7px;font-size:11.5px}
+#penGrp::before{left:calc(90% - 6px)}
+.minilbl{font-family:var(--f-tc);font-size:11.5px;color:var(--ink-2);margin-bottom:-3px}
+#stampGrp::before{left:calc(16.6% - 6px)}
+#tileGrp::before{left:calc(83.3% - 6px)}
+.sub::before{content:"";position:absolute;top:-6px;left:calc(50% - 6px);border:6px solid transparent;border-top:0;border-bottom-color:var(--wash)}
+.sub .tag{font-size:9.5px;color:var(--accent);letter-spacing:.16em}
+.sub .hint{margin:0;font-family:var(--f-tc);font-size:11.5px;line-height:1.55;color:var(--ink-2)}
+.edgeSub{display:flex;flex-direction:column;gap:6px;transition:opacity .15s}
+.edgeSub.dim{opacity:.4}
+.toast{position:absolute;top:14px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;font-size:12px;padding:6px 12px;border-radius:999px;pointer-events:none;transition:opacity .2s;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+.status{grid-area:status;display:flex;gap:14px;align-items:center;font-family:var(--f-mono);font-size:10.5px;color:var(--ink-2);padding-block:8px;white-space:nowrap;overflow:hidden;min-width:0}
+.status b{color:var(--ink);font-weight:400}
+.status .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex:none}
+.status .dot.erase{background:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink),0 0 0 1px #fff}
+.status .sp{flex:1}
+
+/* inspector */
+.panel{grid-area:panel;min-height:0;overflow-y:auto;border-left:1px solid var(--hair);margin-top:12px;padding:0 0 12px 18px;display:flex;flex-direction:column}
+.grp{padding-block:14px;border-bottom:1px solid var(--hair);display:flex;flex-direction:column;gap:10px}
+.grp:first-child{padding-top:2px}
+.grp:last-child{border-bottom:0}
+.lbl{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.lbl span:first-child{font-family:var(--f-tc);letter-spacing:.2em;font-size:11px;color:var(--ink);font-weight:500;text-transform:none}
+kbd{font-family:var(--f-mono);font-size:10px;color:var(--ink-2);border:1px solid var(--hair);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:var(--sheet)}
+
+.tabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.tabs button{background:var(--sheet);border:0;border-left:1px solid var(--ink);color:var(--ink);font:400 12px var(--f-tc);padding:7px 2px;cursor:pointer;white-space:nowrap}
+.tabs button:first-child{border-left:0}
+.tabs button:hover{background:var(--wash)}
+.tabs button.on{background:var(--ink);color:#fff}
+.tabs.shape button{font-size:15px;line-height:1;padding:6px 0}
+.tabs.small button{font-size:11.5px;padding:5px 2px}
+
+.btn{background:var(--sheet);border:1px solid var(--hair);color:var(--ink);font:400 12px var(--f-tc);padding:6px 11px;border-radius:4px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:var(--ink)}
+.btn.dark{background:var(--ink);border-color:var(--ink);color:#fff}
+.btn.dark:hover{background:#5a5955}
+.btn.pink{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pink:hover{filter:brightness(.95)}
+.btn.ghost{border-color:transparent;padding-inline:8px}
+.btn.ghost:hover{border-color:var(--hair)}
+.btn.lang{font-family:var(--f-ui);min-width:52px;justify-content:center;color:var(--ink-2)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.slider{display:grid;grid-template-columns:50px 1fr 58px;align-items:center;gap:10px}
+.slider label{font-family:var(--f-tc);color:var(--ink-2);font-size:12px}
+.numbox{display:inline-flex;align-items:baseline;justify-self:end;gap:2px;border-bottom:1px solid var(--hair);padding-bottom:1px}
+.numbox:focus-within{border-bottom-color:var(--accent)}
+.num{width:4.6ch;min-width:0;border:0;background:transparent;font:400 11px var(--f-mono);color:var(--ink);text-align:right;padding:2px 0;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+.num::-webkit-outer-spin-button,.num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.num:focus{outline:none}
+.numbox i{font:normal 9.5px var(--f-mono);color:var(--ink-3)}
+.tip{position:fixed;z-index:20;max-width:240px;background:var(--ink);color:#fff;font:400 11.5px/1.5 var(--f-tc);padding:7px 10px;border-radius:5px;pointer-events:none;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.btn.toggle[aria-pressed="true"]{border-color:var(--ink-3);color:var(--ink)}
+.btn.toggle[aria-pressed="false"]{color:var(--ink-3)}
+.btn.toggle .q{display:inline-grid;place-items:center;width:14px;height:14px;border-radius:50%;border:1px solid currentColor;font:500 9.5px var(--f-mono)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:18px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:1px;background:var(--ink)}
+input[type=range]::-moz-range-track{height:1px;background:var(--ink)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--sheet);border:1.5px solid var(--ink);margin-top:-6px}
+input[type=range]::-moz-range-thumb{width:10px;height:10px;border-radius:50%;background:var(--sheet);border:1.5px solid var(--ink)}
+input[type=range]:hover::-webkit-slider-thumb{background:var(--accent);border-color:var(--accent)}
+input[type=range]:hover::-moz-range-thumb{background:var(--accent);border-color:var(--accent)}
+
+.sw{display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;font-family:var(--f-tc);font-size:12px;color:var(--ink-2)}
+.sw .t{display:flex;gap:6px;align-items:center}
+.sw input{appearance:none;-webkit-appearance:none;width:26px;height:14px;border-radius:999px;background:var(--hair);position:relative;margin:0;cursor:pointer;transition:background .15s;flex:none}
+.sw input::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked{background:var(--ink)}
+.sw input:checked::after{transform:translateX(12px)}
+.sws{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+.buf{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;min-height:42px}
+.buf .slot{position:relative;padding:0;border:0;background:none;cursor:pointer;border-radius:2px;outline:1px solid var(--hair);outline-offset:-1px;aspect-ratio:1;overflow:hidden}
+.buf .slot canvas{display:block;width:100%;height:100%;opacity:.72;transition:opacity .12s}
+.buf .slot:hover canvas,.buf .slot.sel canvas{opacity:1}
+.buf .slot.sel{outline:2px solid var(--accent);outline-offset:-2px}
+.buf .slot .n{position:absolute;left:2px;bottom:1px;font-family:var(--f-mono);font-size:9px;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.6)}
+.buf .empty{grid-column:1/-1;border:1px dashed var(--hair);border-radius:4px;color:var(--ink-3);font-family:var(--f-tc);font-size:11.5px;display:grid;place-items:center;padding:12px 8px;text-align:center}
+
+details.keys summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+details.keys summary::-webkit-details-marker{display:none}
+details.keys summary::after{content:"+";font-family:var(--f-mono);color:var(--ink-3)}
+details.keys[open] summary::after{content:"−"}
+.keys dl{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;margin:10px 0 0;font-family:var(--f-tc);font-size:11.5px;color:var(--ink-2)}
+.keys dt{justify-self:start}
+.keys dd{margin:0}
+
+.modal{position:fixed;inset:0;background:rgba(21,21,21,.45);display:grid;place-items:center;padding:16px;z-index:10}
+.modal .box{background:var(--sheet);border:1px solid var(--ink);border-radius:6px;padding:16px;max-width:min(720px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.modal img{max-width:100%;max-height:60vh;object-fit:contain;background:var(--bench)}
+.modal p{margin:0;color:var(--ink-2);font-family:var(--f-tc);line-height:1.6}
+.dlg{max-width:440px}
+.dlg h3{margin:0;font:500 15px var(--f-tc);letter-spacing:.06em;color:var(--ink)}
+.dlgBtns{justify-content:flex-end}
+.modal a{color:var(--accent);font-weight:500}
+
+/* tablet (iPad portrait / small laptop): keep the side-by-side layout, slimmer panel, compact header */
+@media (max-width:1180px){
+  .app{grid-template-columns:minmax(0,1fr) 264px}
+  .doc{display:none}
+  .top{gap:10px;flex-wrap:wrap}
+  .top .actions{gap:4px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+  .top .btn{padding:6px 9px}
+  .brand small{display:none}
+  .panel{padding-left:14px}
+}
+.app.nopanel{grid-template-columns:minmax(0,1fr);grid-template-areas:"top" "stage" "status"}
+.app.nopanel .panel{display:none}
+.btn.panelbtn[aria-pressed="false"]{color:var(--ink-3)}
+#btnCapture[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+@media (max-width:600px){ #btnPanel{display:none} }
+@media (max-width:600px){
+  html,body{height:auto}
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 60vh auto auto;grid-template-areas:"top" "stage" "status" "panel";height:auto}
+  .panel{border-left:0;padding-left:0;overflow:visible;border-top:1px solid var(--ink)}
+  .doc{display:none}
+}
+@media (prefers-reduced-motion:reduce){.toast,.sw input,.sw input::after{transition:none}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><h1 data-i18n="title">切片拼貼實驗模組</h1><small>SLICE COLLAGE LAB 0.3</small></div>
+    <div class="doc" id="docChip"></div>
+    <div class="actions">
+      <button class="btn ghost panelbtn" id="btnPanel" aria-pressed="true"><span data-i18n="panelBtn">面板</span></button>
+      <button class="btn ghost lang" id="btnLang" data-i18n="langBtn">EN</button>
+      <button class="btn ghost toggle" id="btnTips" aria-pressed="true"><span class="q" aria-hidden="true">?</span><span data-i18n="tipsBtn">提示</span></button>
+      <button class="btn" id="btnLoad" data-i18n="load">載入圖片</button>
+      <button class="btn" id="btnSvg" data-i18n="exportSvg">匯出 SVG</button>
+      <button class="btn" id="btnPsd" data-i18n="exportPsd">匯出 PSD</button>
+      <button class="btn pink" id="btnExport" data-i18n="export">匯出 PNG</button>
+      <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
+    </div>
+  </header>
+
+  <div class="stage" id="stage"><div class="toast" id="toast" hidden></div><button type="button" class="gridpill" id="gridPill" aria-pressed="false"><span class="ico" aria-hidden="true"></span><span id="gridPillTxt"></span></button></div>
+  <div class="status" id="statusChip"></div>
+
+  <aside class="panel" id="panel">
+    <div class="grp">
+      <div class="lbl"><span data-i18n="draw">繪製</span><kbd>M</kbd></div>
+      <div class="tabs" data-key="draw"></div>
+      <div class="sws">
+        <label class="sw"><span class="t"><span data-i18n="erase">橡皮擦</span> <kbd>E</kbd></span><input type="checkbox" id="erase"></label>
+      </div>
+      <div class="sub" id="stampGrp">
+        <div class="lbl"><span data-i18n="stampH">蓋印設定</span><span class="tag" data-i18n="stampTag"></span></div>
+        <label class="sw"><span class="t" data-i18n="followPath"></span><input type="checkbox" id="followPath"></label>
+        <div class="slider"><label for="sizeEnd" data-i18n="sizeEnd"></label><input type="range" id="sizeEnd" min="0.1" max="3" step="0.05"><span class="numbox"><input type="number" class="num" id="sizeEndOut" inputmode="decimal"><i id="sizeEndUnit"></i></span></div>
+        <div class="slider"><label for="sizeSteps" data-i18n="sizeSteps"></label><input type="range" id="sizeSteps" min="2" max="60" step="1"><span class="numbox"><input type="number" class="num" id="sizeStepsOut" inputmode="decimal"><i id="sizeStepsUnit"></i></span></div>
+        <p class="hint" data-i18n="sizeHint"></p>
+        <div class="slider"><label for="driftX" data-i18n="driftX"></label><input type="range" id="driftX" min="-80" max="80" step="1"><span class="numbox"><input type="number" class="num" id="driftXOut" inputmode="decimal"><i id="driftXUnit"></i></span></div>
+        <div class="slider"><label for="driftY" data-i18n="driftY"></label><input type="range" id="driftY" min="-80" max="80" step="1"><span class="numbox"><input type="number" class="num" id="driftYOut" inputmode="decimal"><i id="driftYUnit"></i></span></div>
+        <p class="hint" data-i18n="driftHint"></p>
+      </div>
+      <div class="sub" id="tileGrp">
+        <div class="lbl"><span data-i18n="tileH">平鋪設定</span><span class="tag" data-i18n="tileTag"></span></div>
+        <p class="hint" data-i18n="tileHint"></p>
+        <div class="minilbl" data-i18n="layout"></div>
+        <div class="tabs small" data-key="tileLayout"></div>
+        <div class="minilbl" data-i18n="pattern"></div>
+        <div class="tabs small" data-key="tilePattern"></div>
+      </div>
+      <div class="sub" id="stretchGrp">
+        <div class="lbl"><span data-i18n="stretchH">拉伸設定</span><span class="tag" data-i18n="stretchTag">STRETCH</span></div>
+        <p class="hint" data-i18n="stretchHint"></p>
+        <label class="sw"><span class="t" data-i18n="stretchFree">自由角度</span><input type="checkbox" id="stretchFree"></label>
+        <label class="sw" id="angleSnapRow"><span class="t" data-i18n="angleSnap">角度吸附 15°</span><input type="checkbox" id="angleSnap"></label>
+        <label class="sw"><span class="t" data-i18n="stretchEdge">邊緣拉絲</span><input type="checkbox" id="stretchEdge"></label>
+        <div class="edgeSub" id="edgeSub">
+          <div class="slider"><label for="edgeW" data-i18n="edgeW">邊緣寬</label><input type="range" id="edgeW" min="1" max="60" step="1"><span class="numbox"><input type="number" class="num" id="edgeWOut" inputmode="decimal"><i id="edgeWUnit"></i></span></div>
+          <div class="slider"><label for="fade" data-i18n="fade">淡出</label><input type="range" id="fade" min="0" max="1" step="0.01"><span class="numbox"><input type="number" class="num" id="fadeOut" inputmode="decimal"><i id="fadeUnit"></i></span></div>
+          <div class="slider"><label for="jitter" data-i18n="jitter">抖動</label><input type="range" id="jitter" min="0" max="1" step="0.01"><span class="numbox"><input type="number" class="num" id="jitterOut" inputmode="decimal"><i id="jitterUnit"></i></span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl"><span data-i18n="sampleH">取樣</span><kbd>S</kbd></div>
+      <div class="tabs small" data-key="sample"></div>
+      <div class="sws">
+        <label class="sw"><span class="t" data-i18n="sampleComp">從合成取樣</span><input type="checkbox" id="sampleComp"></label>
+        <label class="sw"><span class="t"><span data-i18n="showSrc">顯示原圖</span> <kbd>I</kbd></span><input type="checkbox" id="showSrc"></label>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl"><span data-i18n="brush">筆刷</span><span>W × H</span></div>
+      <div class="slider"><label for="bw" data-i18n="w">寬</label><input type="range" id="bw" min="4" max="800" step="1"><span class="numbox"><input type="number" class="num" id="bwOut" inputmode="decimal"><i id="bwUnit"></i></span></div>
+      <div class="slider"><label for="bh" data-i18n="h">高</label><input type="range" id="bh" min="4" max="800" step="1"><span class="numbox"><input type="number" class="num" id="bhOut" inputmode="decimal"><i id="bhUnit"></i></span></div>
+      <div class="slider"><label for="spacing" data-i18n="spacing">間距</label><input type="range" id="spacing" min="0" max="1000" step="1"><span class="numbox"><input type="number" class="num" id="spacingOut" inputmode="decimal"><i id="spacingUnit"></i></span></div>
+      <div class="slider"><label for="opacity" data-i18n="opacity">透明</label><input type="range" id="opacity" min="0.05" max="1" step="0.05"><span class="numbox"><input type="number" class="num" id="opacityOut" inputmode="decimal"><i id="opacityUnit"></i></span></div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl"><span data-i18n="shape">形狀</span><kbd>T</kbd></div>
+      <div class="tabs shape" data-key="shape"></div>
+      <div class="sub pen" id="penGrp">
+        <div class="lbl"><span data-i18n="penTitle">自由形狀</span><span class="tag" data-i18n="penTag"></span></div>
+        <canvas id="penCv" tabindex="0" aria-label="pen"></canvas>
+        <div class="lbl" style="margin-top:2px"><span data-i18n="presetTitle">預設形狀</span><button class="btn ghost small" type="button" id="penClear" data-i18n="penClear"></button></div>
+        <div class="shapeLib" id="presetGrid"></div>
+        <p class="hint" data-i18n="penHint"></p>
+        <div class="lbl" style="margin-top:4px"><span data-i18n="libTitle">形狀庫</span><span id="libCount"></span></div>
+        <div class="shapeLib" id="shapeLib"></div>
+        <div class="row"><button class="btn small" type="button" id="libSave" data-i18n="libSave"></button></div>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <button class="btn" id="btnRot"><span id="rotTxt"></span> <kbd>R</kbd></button>
+        <label class="sw" style="gap:10px"><span class="t" data-i18n="flip">隨機鏡像</span><input type="checkbox" id="flip"></label>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="lbl"><span data-i18n="grid">網格</span><span>← → ↑ ↓</span></div>
+      <div class="slider"><label for="gw" data-i18n="gw">橫距</label><input type="range" id="gw" min="4" max="400" step="1"><span class="numbox"><input type="number" class="num" id="gwOut" inputmode="decimal"><i id="gwUnit"></i></span></div>
+      <div class="slider"><label for="gh" data-i18n="gh">縱距</label><input type="range" id="gh" min="4" max="400" step="1"><span class="numbox"><input type="number" class="num" id="ghOut" inputmode="decimal"><i id="ghUnit"></i></span></div>
+      <label class="sw"><span class="t"><span data-i18n="showGrid">顯示網格</span> <kbd>H</kbd></span><input type="checkbox" id="gridOn"></label>
+      <div class="tabs small" data-key="gridView" id="gridStyle"></div>
+      <label class="sw"><span class="t"><span data-i18n="snap">吸附網格</span> <kbd>G</kbd></span><input type="checkbox" id="snap"></label>
+    </div>
+
+    <div class="grp">
+      <div class="lbl"><span data-i18n="stash">暫存區</span><span id="bufCount">0 / 24</span></div>
+      <div class="buf" id="buf"></div>
+      <div class="row">
+        <button class="btn" id="btnCapture" aria-pressed="false"><span data-i18n="captureBtn">＋ 點畫面存入</span></button>
+        <button class="btn ghost" id="btnClearBuf"><span data-i18n="clearStash">清空暫存</span> <kbd>A</kbd></button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <div class="row">
+        <button class="btn" id="btnUndo"><span data-i18n="undo">復原</span> <kbd>⌘Z</kbd></button>
+        <button class="btn" id="btnClear"><span data-i18n="clearCanvas">清空畫布</span> <kbd>C</kbd></button>
+        <button class="btn ghost" id="btnSample" data-i18n="sampleImg">範例圖</button>
+      </div>
+    </div>
+
+    <div class="grp">
+      <details class="keys">
+        <summary class="lbl"><span data-i18n="help">操作說明</span></summary>
+        <dl>
+          <dt><kbd data-i18n="k_drag"></kbd></dt><dd data-i18n="d_drag"></dd>
+          <dt><kbd data-i18n="k_rdrag"></kbd></dt><dd data-i18n="d_rdrag"></dd>
+          <dt><kbd data-i18n="k_wheel"></kbd></dt><dd data-i18n="d_wheel"></dd>
+          <dt><kbd data-i18n="k_pinch"></kbd></dt><dd data-i18n="d_pinch"></dd>
+          <dt><kbd data-i18n="k_shift"></kbd></dt><dd data-i18n="d_shift"></dd>
+          <dt><kbd>1–9</kbd></dt><dd data-i18n="d_num"></dd>
+          <dt><kbd data-i18n="k_alt"></kbd></dt><dd data-i18n="d_alt"></dd>
+          <dt><kbd>[ ]</kbd></dt><dd data-i18n="d_br"></dd>
+          <dt><kbd>D</kbd></dt><dd data-i18n="export"></dd>
+          <dt><kbd>V</kbd></dt><dd data-i18n="exportSvg"></dd>
+          <dt><kbd>P</kbd></dt><dd data-i18n="exportPsd"></dd>
+          <dt><kbd data-i18n="k_drop"></kbd></dt><dd data-i18n="d_drop"></dd>
+        </dl>
+      </details>
+    </div>
+  </aside>
+</div>
+
+<div class="tip" id="tip" role="tooltip" hidden></div>
+<div class="modal" id="dlg" hidden role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+  <div class="box dlg">
+    <h3 id="dlgTitle"></h3>
+    <p id="dlgText"></p>
+    <div class="row dlgBtns" id="dlgBtns"></div>
+  </div>
+</div>
+<div class="modal" id="modal" hidden>
+  <div class="box">
+    <img id="modalImg" alt="" data-i18n-alt="modalAlt">
+    <p data-i18n="modalText"></p>
+    <div class="row"><a id="modalLink" href="#" download data-i18n="modalLink">下載 PNG</a><span style="flex:1"></span><button class="btn" id="modalClose" data-i18n="close">關閉</button></div>
+  </div>
+</div>
+
+<script src="lib/p5.min.js"></script>
+<script>
+const MAX_SIDE = 1800, UNDO_MAX = 12, BUF_MAX = 24;
+const DRAW_MODES = [['stamp','蓋印'],['stretch','拉伸'],['tile','平鋪']];
+const SAMPLE_MODES = [['press','按下擷取'],['smear','拖曳塗抹'],['buffer','緩衝切片'],['random','隨機取樣']];
+const SHAPES = [['rect','矩形'],['ellipse','橢圓'],['tri','三角'],['diamond','菱形'],['free','自由']];
+const GRID_VIEWS = [['all','整張'],['near','游標附近']];
+const TILE_LAYOUTS = [['lgrid','格狀'],['brick','磚牆']];
+const TILE_PATTERNS = [['pnone','無'],['mirror','鏡像'],['rotate','旋轉'],['shuffle','重組']];
+const GLYPH = {rect:'□',ellipse:'○',tri:'△',diamond:'◇',free:'✎'};
+const I18N = {
+  zh: {
+    title:'切片拼貼實驗模組', langBtn:'EN', langTitle:'Switch to English', langSet:'已切換為中文',
+    tipsBtn:'提示', panelBtn:'面板', captureBtn:'＋ 點畫面存入', captureArmed:'點一下畫面，把那一塊存入暫存區', tip_panel:'顯示或收起右側面板，讓畫布更大', tip_capture:'按下後點一下畫面，就能把該區塊存入暫存區（觸控裝置不用按 Shift）', free:'自由', tip_free:'用鋼筆工具自訂切片的遮罩形狀', penTitle:'自由形狀', penTag:'鋼筆', pBlob:'水滴', pLeaf:'葉形', pStar:'星形', pCircle:'圓形', penClear:'清除', penHint:'點擊空白處新增錨點，按住拖曳可拉出曲線把手。拖曳錨點可移動；Alt＋拖曳把手可單獨調整一側；雙擊錨點切換尖角／平滑；選取錨點後按 Delete 刪除。至少需要 3 個錨點，或 2 個帶曲線的錨點。', penCleared:'已清除，點擊畫框新增錨點', libTitle:'形狀庫', presetTitle:'預設形狀', tip_pr_blob:'水滴', tip_pr_circle:'圓形', tip_pr_leaf:'葉形', tip_pr_star:'星形', tip_pr_trap:'梯形', tip_pr_para:'平行四邊形', tip_pr_thorn:'尖刺', tip_pr_shard:'碎片', tip_pr_chevron:'折角', tip_pr_arrow:'箭頭', tip_pr_bolt:'閃電', tip_pr_zigzag:'鋸齒', tip_pr_spike:'放射尖星', libSave:'＋ 存入目前形狀', libEmpty:'把畫好的形狀存起來，之後點縮圖就能叫回來使用', libSaved:n=>`已存入形狀 ${n}`, libLoaded:n=>`已套用形狀 ${n}`, libRemoved:n=>`已移除形狀 ${n}`, libFull:n=>`形狀庫最多 ${n} 個，請先移除一些`, libNeed:'形狀至少需要 3 個錨點（或 2 個帶曲線的錨點）才能存入', libItem:n=>`形狀 ${n}：點擊套用，右鍵移除`, tip_libSave:'把目前鋼筆框裡的形狀存進形狀庫', tip_shapeLib:'點縮圖套用形狀，右鍵移除',  penNeed:'自由形狀至少需要 3 個錨點，目前先用矩形',  tipsOn:'功能提示：開', tipsOff:'功能提示：關', exportPsd:'匯出 PSD', psdBuilding:'正在產生 PSD…', psdLoadFail:'PSD 模組載入失敗，請檢查網路後再試', psdEmpty:'畫布上還沒有切片', psdDlgTitle:'圖層數量較多', psdDlgText:(n,s)=>`這份 PSD 會有 ${n} 個切片圖層，分在 ${s} 個筆畫群組裡。圖層過多時，Photoshop 開檔和操作可能變慢、佔用大量記憶體，較舊的電腦可能會卡住。`, psdPerSlice:n=>`每片一個圖層（${n}）`, psdPerStroke:n=>`改成每筆一個圖層（${n}）`, cancel:'取消', tip_lang:"切換介面語言（中文／English）", tip_tips:"開啟後，滑鼠停在按鈕上會顯示功能說明", tip_load:"載入 JPG、PNG 或 WEBP 圖片作為取樣來源；也可以直接拖放或貼上", tip_exportPng:"把目前的畫面輸出成一張 PNG（D）", tip_exportSvg:"輸出可在 Illustrator 編輯的 SVG，每片切片都是獨立物件（V）", tip_exportPsd:"輸出 Photoshop 分層檔：每片切片一個圖層，依筆畫分成群組（P）", tip_gridPill:"顯示或隱藏網格，不影響吸附（H）", tip_stamp:"沿著拖曳路徑一片一片蓋上切片", tip_stretch:"把切片朝拖曳方向拉長", tip_tile:"拖出一個矩形範圍，用切片鋪滿", tip_press:"按下滑鼠時，取游標下的區塊當筆刷", tip_smear:"每一片都取上一片的位置，畫起來像抹開", tip_buffer:"使用暫存區中選取的切片", tip_random:"每一片都從圖上的隨機位置取樣", tip_rect:"切片的遮罩形狀：矩形", tip_ellipse:"切片的遮罩形狀：橢圓", tip_tri:"切片的遮罩形狀：三角", tip_diamond:"切片的遮罩形狀：菱形", tip_all:"在整張畫面顯示網格線", tip_near:"只在游標附近顯示格點", tip_lgrid:"切片整齊排成格狀", tip_brick:"每隔一列錯開半格，像磚牆", tip_pnone:"所有格子方向一致", tip_mirror:"相鄰格子左右、上下翻轉，接縫相連", tip_rotate:"每 2×2 格依 0°、90°、180°、270° 排成風車", tip_shuffle:"把範圍內的原圖切成格子，再打亂重排", tip_erase:"切換成橡皮擦，擦掉畫上去的切片（E）", tip_stretchEdge:"只取切片邊緣的一條帶狀像素往外拉，形成拉絲", tip_sampleComp:"從「原圖＋已畫內容」的合成結果取樣，可以重複再拼貼", tip_showSrc:"顯示或隱藏底下的原圖（I）", tip_followPath:"切片會轉向拖曳的方向", tip_flip:"每一片隨機左右翻轉", tip_gridOn:"顯示或隱藏網格（H）", tip_snap:"筆刷的尺寸和位置對齊網格（G）", tip_rot:"把切片旋轉 90°（R）", tip_clearStash:"清空暫存區的所有切片（A）", tip_undo:"復原上一步（⌘Z）", tip_clearCanvas:"清除畫上去的所有切片，可以復原（C）", tip_sampleImg:"重新載入範例圖", tip_stash:"按住 Shift 點擊畫面存入切片；點縮圖選用、右鍵移除，或按數字鍵 1–9 選用", tip_bw:"筆刷寬度（像素）", tip_bh:"筆刷高度（像素）", tip_spacing:"蓋印的間隔，以筆刷尺寸的倍數計算", tip_opacity:"切片的不透明度", tip_edgeW:"從邊緣取多寬的像素來拉絲", tip_fade:"越往遠端越透明", tip_jitter:"每條絲長短不一，末端參差", tip_sizeEnd:"一筆結束時的尺寸；100% 表示不變", tip_sizeSteps:"要蓋幾片才變到終點尺寸", tip_driftX:"每蓋一片，取樣點水平移動的距離", tip_driftY:"每蓋一片，取樣點垂直移動的距離", tip_gw:"網格的橫向間距（← →）", tip_gh:"網格的縱向間距（↑ ↓）",
+    load:'載入圖片', export:'匯出 PNG', exportSvg:'匯出 SVG', exportSvgTitle:'可在 Illustrator 中編輯的 SVG：每片切片都是獨立的剪裁群組（V）', svgEmpty:'畫布上還沒有切片', svgBuilding:'正在產生 SVG…', modalLinkSvg:'下載 SVG', modalLinkPsd:'下載 PSD（ZIP）', gridPillTitle:'顯示／隱藏網格（H）', gridPillOn:'網格 開', gridPillOff:'網格 關',
+    draw:'繪製', erase:'橡皮擦', stretchFree:'自由角度', angleSnap:'角度吸附 15°', tip_stretchFree:'開啟後可以朝任意角度拉伸，不再只鎖水平或垂直', tip_angleSnap:'自由角度拉伸時，角度以 15° 為一格對齊', stretchEdge:'邊緣拉絲', stampH:'蓋印設定', stampTag:'蓋印專用', followPath:'沿路徑旋轉', sizeEnd:'終點尺寸', sizeSteps:'漸變步數', sizeHint:'一筆從 100% 漸變到終點尺寸，設 100% 即關閉。', driftX:'位移 X', driftY:'位移 Y', driftHint:'漸進位移：每蓋一次，取樣點就移動這個距離（限「按下擷取」）。', tileH:'平鋪設定', tileTag:'平鋪專用', tileHint:'拖出一個矩形範圍來鋪滿。「重組」會把範圍內的原圖切成格子，再打亂重排。', layout:'排列', pattern:'規則', lgrid:'格狀', brick:'磚牆', pnone:'無', mirror:'鏡像', rotate:'旋轉', shuffle:'重組', stretchH:'拉伸設定', stretchTag:'拉伸專用', stretchHint:'在畫布上按住往任一方向拖曳，切片會朝那個方向延伸。預設鎖定水平或垂直（Alt 可同時往兩個方向拉）；打開「自由角度」可以朝任意角度拉。', edgeW:'邊緣寬', fade:'淡出', jitter:'抖動', sampleH:'取樣', sampleComp:'從合成取樣', showSrc:'顯示原圖',
+    brush:'筆刷', w:'寬', h:'高', spacing:'間距', opacity:'透明', shape:'形狀', rot:'旋轉', flip:'隨機鏡像',
+    grid:'網格', gw:'橫距', gh:'縱距', showGrid:'顯示網格', snap:'吸附網格',
+    stash:'暫存區', clearStash:'清空暫存', undo:'復原', clearCanvas:'清空畫布', sampleImg:'範例圖', help:'操作說明',
+    k_drag:'左鍵拖曳', d_drag:'繪製', k_rdrag:'右鍵拖曳', d_rdrag:'左右調寬、上下調高',
+    k_wheel:'滾輪', k_pinch:'雙指開合', d_pinch:'觸控裝置上縮放筆刷', d_wheel:'等比縮放筆刷（Shift 只調寬、Alt 只調高）',
+    k_shift:'Shift＋點擊', d_shift:'把游標下的區塊存入暫存區並選用',
+    d_num:'選用暫存區中的切片（右鍵縮圖可移除）', k_alt:'Alt＋拉伸', d_alt:'拉伸時不鎖定方向',
+    d_br:'筆刷縮小／放大', k_drop:'拖放／貼上', d_drop:'載入新圖片',
+    modalAlt:'匯出結果預覽', modalText:'這個視窗不能直接下載。請在圖片上按右鍵選「另存圖片」，或用下方連結（在一般瀏覽器開啟時可用）。', modalLink:'下載 PNG', close:'關閉',
+    stamp:'蓋印', stretch:'拉伸', tile:'平鋪', press:'按下擷取', smear:'拖曳塗抹', buffer:'暫存切片', random:'隨機取樣',
+    rect:'矩形', ellipse:'橢圓', tri:'三角', diamond:'菱形', all:'整張', near:'游標附近',
+    sampleDoc:'範例圖', st_brush:'筆刷', st_grid:'網格', st_snap:'吸附',
+    noUndo:'沒有可以復原的步驟', undone:'已復原', stashEmpty:'暫存區是空的：按住 Shift 點擊畫面存入切片',
+    stashFull:n=>`暫存區最多 ${n} 片，先按 A 清空`, stored:n=>`已存入並選用切片 ${n}`, loaded:n=>`已載入 ${n}`,
+    badType:'請使用 JPG、PNG 或 WEBP 圖片', badFile:'這個檔案讀不出來，換一張試試',
+    exported:n=>`已匯出 ${n}`, exportCancel:'已取消匯出', exportBusy:'儲存視窗已經開著，請先處理它',
+    sampleLoaded:'已載入範例圖', picked:n=>`選用切片 ${n}`, removed:n=>`已移除切片 ${n}`,
+    stashCleared:'已清空暫存區', canvasCleared:'已清空畫布（可復原）',
+    gridOn:'網格：開', gridOff:'網格：關', eraseOn:'橡皮擦：開', eraseOff:'橡皮擦：關', snapOn:'網格吸附：開', snapOff:'網格吸附：關',
+    emptyStash:'按住 Shift 點擊畫面，存入切片', slice:n=>`切片 ${n}`, sliceTitle:(n,w,h)=>`切片 ${n}（${w}×${h}）— 點擊選用，右鍵移除`
+  },
+  en: {
+    title:'Slice Collage Lab', langBtn:'中文', langTitle:'切換為中文', langSet:'Switched to English',
+    tipsBtn:'Tips', panelBtn:'Panel', captureBtn:'+ Tap to store', captureArmed:'Tap the canvas to store that area in the stash', tip_panel:'Show or hide the side panel for a bigger canvas', tip_capture:'Then tap the canvas to store that area in the stash (no Shift needed on touch devices)', free:'Free', tip_free:'Draw your own slice mask with a pen tool', penTitle:'Free shape', penTag:'PEN', pBlob:'Blob', pLeaf:'Leaf', pStar:'Star', pCircle:'Circle', penClear:'Clear', penHint:'Click empty space to add an anchor; drag while pressing to pull out curve handles. Drag anchors to move them; Alt-drag a handle to adjust one side; double-click an anchor to toggle corner/smooth; select an anchor and press Delete to remove it. Needs at least 3 anchors, or 2 curved ones.', penCleared:'Cleared. Click inside the frame to add anchors', libTitle:'Shape library', presetTitle:'Presets', tip_pr_blob:'Blob', tip_pr_circle:'Circle', tip_pr_leaf:'Leaf', tip_pr_star:'Star', tip_pr_trap:'Trapezoid', tip_pr_para:'Parallelogram', tip_pr_thorn:'Thorn', tip_pr_shard:'Shard', tip_pr_chevron:'Chevron', tip_pr_arrow:'Arrow', tip_pr_bolt:'Bolt', tip_pr_zigzag:'Zigzag', tip_pr_spike:'Spike burst', libSave:'+ Save current shape', libEmpty:'Save shapes you draw here and click a thumbnail to bring one back', libSaved:n=>`Saved shape ${n}`, libLoaded:n=>`Applied shape ${n}`, libRemoved:n=>`Removed shape ${n}`, libFull:n=>`The library holds ${n} shapes. Remove some first`, libNeed:'A shape needs at least 3 anchors (or 2 curved ones) to be saved', libItem:n=>`Shape ${n}: click to apply, right-click to remove`, tip_libSave:'Save the shape in the pen frame to the library', tip_shapeLib:'Click a thumbnail to apply it, right-click to remove it',  penNeed:'A free shape needs at least 3 anchors; using a rectangle for now',  tipsOn:'Tips on', tipsOff:'Tips off', exportPsd:'Export PSD', psdBuilding:'Building PSD…', psdLoadFail:'Couldn’t load the PSD module. Check your connection and try again', psdEmpty:'Nothing on the canvas yet', psdDlgTitle:'Lots of layers', psdDlgText:(n,s)=>`This PSD will have ${n} slice layers in ${s} stroke groups. With this many layers, Photoshop may open and run slowly and use a lot of memory; older computers may stall.`, psdPerSlice:n=>`One layer per slice (${n})`, psdPerStroke:n=>`One layer per stroke (${n})`, cancel:'Cancel', tip_lang:"Switch the interface language", tip_tips:"When on, hovering a control shows what it does", tip_load:"Load a JPG, PNG or WEBP image to sample from. You can also drop or paste one", tip_exportPng:"Save the current canvas as a PNG (D)", tip_exportSvg:"Save an SVG you can edit in Illustrator; every slice is its own object (V)", tip_exportPsd:"Save a layered Photoshop file: one layer per slice, grouped by stroke (P)", tip_gridPill:"Show or hide the grid; snapping still works (H)", tip_stamp:"Stamp slices one by one along the drag path", tip_stretch:"Stretch the slice in the drag direction", tip_tile:"Drag out a rectangle and fill it with slices", tip_press:"Use the area under the cursor when you press as the brush", tip_smear:"Each slice samples where the previous one landed, like a smear", tip_buffer:"Use the slice selected in the stash", tip_random:"Sample each slice from a random spot in the image", tip_rect:"Slice mask shape: rectangle", tip_ellipse:"Slice mask shape: ellipse", tip_tri:"Slice mask shape: triangle", tip_diamond:"Slice mask shape: diamond", tip_all:"Show grid lines across the whole canvas", tip_near:"Show grid points only around the cursor", tip_lgrid:"Slices line up in a regular grid", tip_brick:"Every other row shifts by half a cell, like brickwork", tip_pnone:"Every cell faces the same way", tip_mirror:"Neighbouring cells flip so the seams join up", tip_rotate:"Each 2×2 block turns 0°, 90°, 180°, 270° like a pinwheel", tip_shuffle:"Cut the image under the area into cells and rearrange them", tip_erase:"Switch to the eraser to remove painted slices (E)", tip_stretchEdge:"Pull out only a band of edge pixels as streaks", tip_sampleComp:"Sample from the source plus what you have painted, to collage again", tip_showSrc:"Show or hide the source image underneath (I)", tip_followPath:"Slices turn to follow the drag direction", tip_flip:"Randomly mirror each slice", tip_gridOn:"Show or hide the grid (H)", tip_snap:"Snap brush size and position to the grid (G)", tip_rot:"Rotate slices by 90° (R)", tip_clearStash:"Remove every slice from the stash (A)", tip_undo:"Undo the last step (⌘Z)", tip_clearCanvas:"Clear all painted slices; you can undo this (C)", tip_sampleImg:"Reload the sample image", tip_stash:"Shift + click the canvas to store a slice. Click a thumbnail to select it, right-click to remove it, or press 1–9", tip_bw:"Brush width in pixels", tip_bh:"Brush height in pixels", tip_spacing:"Gap between stamps, as a multiple of the brush size", tip_opacity:"Slice opacity", tip_edgeW:"How many edge pixels to pull into streaks", tip_fade:"Streaks fade out towards the far end", tip_jitter:"Streaks vary in length for ragged ends", tip_sizeEnd:"Slice size at the end of a stroke; 100% means no change", tip_sizeSteps:"How many stamps it takes to reach the end size", tip_driftX:"How far the sample point moves sideways per stamp", tip_driftY:"How far the sample point moves vertically per stamp", tip_gw:"Horizontal grid spacing (← →)", tip_gh:"Vertical grid spacing (↑ ↓)",
+    load:'Load image', export:'Export PNG', exportSvg:'Export SVG', exportSvgTitle:'Editable SVG for Illustrator: every slice is its own clip group (V)', svgEmpty:'Nothing on the canvas yet', svgBuilding:'Building SVG…', modalLinkSvg:'Download SVG', modalLinkPsd:'Download PSD (ZIP)', gridPillTitle:'Show / hide grid (H)', gridPillOn:'Grid on', gridPillOff:'Grid off',
+    draw:'Draw', erase:'Eraser', stretchFree:'Any angle', angleSnap:'Snap angle 15°', tip_stretchFree:'Stretch in any direction instead of only horizontally or vertically', tip_angleSnap:'With any-angle stretch, snap the angle to 15° steps', stretchEdge:'Edge streak', stampH:'Stamp settings', stampTag:'STAMP ONLY', followPath:'Follow path', sizeEnd:'End size', sizeSteps:'Steps', sizeHint:'Each stroke scales from 100% to the end size. 100% turns it off.', driftX:'Drift X', driftY:'Drift Y', driftHint:'Sample drift: the sample point moves this far per stamp (On press only).', tileH:'Tile settings', tileTag:'TILE ONLY', tileHint:'Drag out a rectangle to fill. Shuffle cuts the image under it into cells and rearranges them.', layout:'Layout', pattern:'Pattern', lgrid:'Grid', brick:'Brick', pnone:'None', mirror:'Mirror', rotate:'Rotate', shuffle:'Shuffle', stretchH:'Stretch settings', stretchTag:'STRETCH ONLY', stretchHint:'Press and drag; the slice extends that way. By default it locks to horizontal or vertical (Alt stretches both ways); turn on Any angle to stretch in any direction.', edgeW:'Edge', fade:'Fade', jitter:'Jitter', sampleH:'Sample', sampleComp:'Composite', showSrc:'Source',
+    brush:'Brush', w:'W', h:'H', spacing:'Spacing', opacity:'Opacity', shape:'Shape', rot:'Rotate', flip:'Random flip',
+    grid:'Grid', gw:'Col', gh:'Row', showGrid:'Show grid', snap:'Snap to grid',
+    stash:'Stash', clearStash:'Clear stash', undo:'Undo', clearCanvas:'Clear canvas', sampleImg:'Sample', help:'Controls',
+    k_drag:'Left drag', d_drag:'Paint', k_rdrag:'Right drag', d_rdrag:'Horizontal sets width, vertical sets height',
+    k_wheel:'Scroll', k_pinch:'Pinch', d_pinch:'Resize the brush on touch screens', d_wheel:'Scale brush (Shift: width only, Alt: height only)',
+    k_shift:'Shift + click', d_shift:'Store the area under the cursor in the stash and select it',
+    d_num:'Select a stashed slice (right-click a thumbnail to remove it)', k_alt:'Alt + stretch', d_alt:'Stretch in any direction',
+    d_br:'Smaller / larger brush', k_drop:'Drop / paste', d_drop:'Load a new image',
+    modalAlt:'Export preview', modalText:'This view can’t download files directly. Right-click the image and choose “Save image”, or use the link below (works when opened in a regular browser).', modalLink:'Download PNG', close:'Close',
+    stamp:'Stamp', stretch:'Stretch', tile:'Tile', press:'On press', smear:'Smear', buffer:'Stash', random:'Random',
+    rect:'Rectangle', ellipse:'Ellipse', tri:'Triangle', diamond:'Diamond', all:'Full', near:'Near cursor',
+    sampleDoc:'Sample', st_brush:'Brush', st_grid:'Grid', st_snap:'snap',
+    noUndo:'Nothing to undo', undone:'Undone', stashEmpty:'The stash is empty: Shift + click the canvas to store a slice',
+    stashFull:n=>`The stash holds ${n} slices. Press A to clear it`, stored:n=>`Stored and selected slice ${n}`, loaded:n=>`Loaded ${n}`,
+    badType:'Use a JPG, PNG or WEBP image', badFile:'This file can’t be read. Try another image',
+    exported:n=>`Exported ${n}`, exportCancel:'Export cancelled', exportBusy:'A save dialog is already open',
+    sampleLoaded:'Sample loaded', picked:n=>`Selected slice ${n}`, removed:n=>`Removed slice ${n}`,
+    stashCleared:'Stash cleared', canvasCleared:'Canvas cleared (undo to restore)',
+    gridOn:'Grid on', gridOff:'Grid off', eraseOn:'Eraser on', eraseOff:'Eraser off', snapOn:'Snap on', snapOff:'Snap off',
+    emptyStash:'Shift + click the canvas to store slices', slice:n=>`Slice ${n}`, sliceTitle:(n,w,h)=>`Slice ${n} (${w}×${h}) — click to select, right-click to remove`
+  }
+};
+function t(k, ...a){ const d = I18N[S.lang] || I18N.zh; const v = k in d ? d[k] : (I18N.zh[k] ?? k); return typeof v === 'function' ? v(...a) : v; }
+function applyLang(){
+  document.documentElement.lang = S.lang === 'en' ? 'en' : 'zh-Hant';
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
+  document.querySelectorAll('[data-i18n-alt]').forEach(el => { el.alt = t(el.dataset.i18nAlt); });
+  document.querySelectorAll('.tabs').forEach(el => el.querySelectorAll('button').forEach(b => {
+    const v = b.dataset.val, l = t(v);
+    b.textContent = el.dataset.key === 'shape' ? GLYPH[v] : l; b.removeAttribute('title'); b.dataset.tip = v; b.setAttribute('aria-label', l);
+  }));
+  renderBuffer(); if(typeof renderLib === 'function') renderLib(); syncUI();
+}
+function toggleLang(){ S.lang = S.lang === 'en' ? 'zh' : 'en'; savePrefs(); applyLang(); toast(t('langSet')); }
+
+const S = {draw:'stamp',sample:'press',shape:'rect',rot:0,bw:160,bh:120,spacing:1,opacity:1,gw:40,gh:40,
+  snap:true,lang:'zh',gridOn:false,gridView:'all',showSrc:true,erase:false,flip:false,sampleComp:false,stretchEdge:false,edgeW:1,fade:0,jitter:0,followPath:false,sizeEnd:1,sizeSteps:20,driftX:0,driftY:0,tileLayout:'lgrid',tilePattern:'pnone',tips:true,customPath:null,shapeLib:[],stretchFree:false,angleSnap:false,panelOpen:true};
+try{ const p = JSON.parse(localStorage.getItem('slice-bench-v2')||'null'); if(p) Object.assign(S,p); }catch(e){}
+S.erase = false;
+if(S.gridView === 'off'){ S.gridView = 'all'; S.gridOn = false; }
+function savePrefs(){ try{ localStorage.setItem('slice-bench-v2', JSON.stringify(S)); }catch(e){} }
+
+let docW = 1600, docH = 1100, docName = '', isSample = true;
+const srcC = document.createElement('canvas'), outC = document.createElement('canvas');
+const outCtx = () => outC.getContext('2d');
+let view = {s:1,ox:0,oy:0};
+let buffer = [], bufIdx = 0, undoStack = [];
+// editable record of every committed slice, used for the SVG export
+let ops = [], sidSeq = 0, curSid = 0, curMode = 'stamp';
+function recordOp(slice, r, o, clip){
+  ops.push({sid:curSid, mode:curMode, slice: slice ? {c:slice.c, sx:slice.sx, sy:slice.sy, sw:slice.sw, sh:slice.sh} : null,
+    r:{x:r.x, y:r.y, w:r.w, h:r.h}, o:{rot:o.rot||0, angle:o.angle||0, flip:!!o.flip, flipY:!!o.flipY, shape:o.shape, path:o.path || null, alpha:o.alpha, erase:!!o.erase}, clip: clip ? {...clip} : null});
+}
+function commitPaint(slice, r, o, clip){ paint(outCtx(), slice, r, o); recordOp(slice, r, o, clip); }
+function newSid(mode){ curSid = ++sidSeq; curMode = mode; }
+let touches = new Map(), pinch = null, captureNext = false;
+let stroke = null, resizing = null, hover = null, flash = null;
+let downloads = null, checker = null, cnv, stageEl;
+
+try{ window.claude?.use?.('downloads').then(d => { downloads = d; }).catch(()=>{}); }catch(e){}
+
+const $ = id => document.getElementById(id);
+function mk(w,h){ const c = document.createElement('canvas'); c.width = Math.max(1,Math.round(w)); c.height = Math.max(1,Math.round(h)); return c; }
+function setDoc(w,h){ docW = w; docH = h; srcC.width = outC.width = w; srcC.height = outC.height = h; }
+const clampN = (v,a,b) => Math.min(b, Math.max(a, v));
+
+/* ---------- geometry ---------- */
+function fitView(){
+  if(!cnv) return;
+  const pad = 40, W = width, H = height;
+  const s = Math.max(0.01, Math.min((W-pad*2)/docW, (H-pad*2)/docH));
+  view = {s, ox:(W-docW*s)/2, oy:(H-docH*s)/2};
+}
+function toDoc(lx,ly){ return {x:(lx-view.ox)/view.s, y:(ly-view.oy)/view.s}; }
+function footprint(){
+  let w = S.bw, h = S.bh;
+  if(S.snap){ w = Math.max(S.gw, Math.round(w/S.gw)*S.gw); h = Math.max(S.gh, Math.round(h/S.gh)*S.gh); }
+  return {w,h};
+}
+function rectAt(cx,cy){
+  const {w,h} = footprint();
+  let x = cx - w/2, y = cy - h/2;
+  if(S.snap){ x = Math.round(x/S.gw)*S.gw; y = Math.round(y/S.gh)*S.gh; }
+  return {x,y,w,h};
+}
+function clampSrc(r){
+  const w = Math.min(r.w, docW), h = Math.min(r.h, docH);
+  return {x:clampN(r.x,0,docW-w), y:clampN(r.y,0,docH-h), w, h};
+}
+function randomRect(w,h){
+  let x = Math.random()*Math.max(0,docW-w), y = Math.random()*Math.max(0,docH-h);
+  if(S.snap){ x = Math.floor(x/S.gw)*S.gw; y = Math.floor(y/S.gh)*S.gh; }
+  return clampSrc({x,y,w,h});
+}
+
+/* ---------- slices & painting ---------- */
+function grab(r, comp){
+  const c = mk(r.w, r.h), g = c.getContext('2d');
+  if(!comp || S.showSrc) g.drawImage(srcC, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+  if(comp) g.drawImage(outC, r.x, r.y, r.w, r.h, 0, 0, c.width, c.height);
+  return {c, sx:0, sy:0, sw:c.width, sh:c.height};
+}
+const sampleAt = r => grab(clampSrc(r), S.sampleComp);
+
+function pathClosed(P){ return !!P && (P.length >= 3 || (P.length === 2 && P.some(a => a.ix || a.iy || a.ox || a.oy))); }
+function pathPts(path){ return pathClosed(path) ? path : null; }
+function shapePath(ctx, shape, w, h, path){
+  ctx.beginPath();
+  if(shape === 'free'){
+    const P = pathPts(path || S.customPath);
+    if(P){
+      ctx.moveTo(P[0].x*w, P[0].y*h);
+      P.forEach((a, i) => { const b = P[(i+1) % P.length]; ctx.bezierCurveTo((a.x+a.ox)*w, (a.y+a.oy)*h, (b.x+b.ix)*w, (b.y+b.iy)*h, b.x*w, b.y*h); });
+      ctx.closePath(); return;
+    }
+  }
+  if(shape === 'ellipse') ctx.ellipse(0,0,w/2,h/2,0,0,Math.PI*2);
+  else if(shape === 'tri'){ ctx.moveTo(0,-h/2); ctx.lineTo(w/2,h/2); ctx.lineTo(-w/2,h/2); ctx.closePath(); }
+  else if(shape === 'diamond'){ ctx.moveTo(0,-h/2); ctx.lineTo(w/2,0); ctx.lineTo(0,h/2); ctx.lineTo(-w/2,0); ctx.closePath(); }
+  else ctx.rect(-w/2,-h/2,w,h);
+}
+function paint(ctx, slice, r, o){
+  ctx.save();
+  ctx.globalAlpha = o.alpha;
+  ctx.translate(r.x + r.w/2, r.y + r.h/2);
+  ctx.rotate(o.rot * Math.PI/2 + (o.angle || 0));
+  const odd = o.rot % 2, dw = odd ? r.h : r.w, dh = odd ? r.w : r.h;
+  if(o.flip || o.flipY) ctx.scale(o.flip ? -1 : 1, o.flipY ? -1 : 1);
+  shapePath(ctx, o.shape, dw, dh, o.path);
+  if(o.erase){ ctx.globalCompositeOperation = 'destination-out'; ctx.fillStyle = '#000'; ctx.fill(); }
+  else if(slice){ ctx.clip(); ctx.drawImage(slice.c, slice.sx, slice.sy, slice.sw, slice.sh, -dw/2, -dh/2, dw, dh); }
+  ctx.restore();
+}
+const curOpts = () => ({rot:S.rot, flip:S.flip && Math.random() < .5, shape:S.shape, path:S.shape === 'free' ? S.customPath : null, alpha:S.opacity, erase:S.erase});
+
+function wrapRect(r){
+  const W = docW - r.w, H = docH - r.h;
+  return {x: W > 0 ? ((r.x % W) + W) % W : 0, y: H > 0 ? ((r.y % H) + H) % H : 0, w:Math.min(r.w, docW), h:Math.min(r.h, docH)};
+}
+function nextSlice(r, k){
+  if(S.sample === 'press' && stroke.mode === 'stamp' && k > 0 && (S.driftX || S.driftY)){
+    const pr = stroke.pressRect;
+    return grab(wrapRect({x:pr.x + k*S.driftX, y:pr.y + k*S.driftY, w:pr.w, h:pr.h}), S.sampleComp);
+  }
+  switch(S.sample){
+    case 'smear': return grab(clampSrc(stroke.prevRect || stroke.pressRect), true);
+    case 'buffer': return buffer[Math.min(bufIdx, buffer.length-1)];
+    case 'random': return sampleAt(randomRect(r.w, r.h));
+    default: return stroke.slice;
+  }
+}
+
+/* ---------- strokes ---------- */
+function pushUndo(){
+  const c = mk(docW, docH); c.getContext('2d').drawImage(outC, 0, 0);
+  undoStack.push({c, ops:ops.slice()}); if(undoStack.length > UNDO_MAX) undoStack.shift();
+}
+function undo(){
+  const u = undoStack.pop();
+  if(!u){ toast(t('noUndo')); return; }
+  const g = outCtx(); g.clearRect(0,0,docW,docH); g.drawImage(u.c,0,0); ops = u.ops;
+  toast(t('undone'));
+}
+
+function beginStroke(p){
+  if(S.sample === 'buffer' && !buffer.length && !S.erase){ toast(t('stashEmpty')); return; }
+  pushUndo(); newSid(S.erase ? 'erase' : S.draw);
+  const pressRect = rectAt(p.x, p.y);
+  stroke = {k:0, angle:0, tileKey:null, perm:null, seed:(Math.random()*2**31)|0, mode:S.draw, start:p, last:{...p}, lastKey:null, pressRect, prevRect:null, slice:null, tiles:[], bufStart:bufIdx};
+  if(S.sample === 'press' || S.sample === 'smear') stroke.slice = sampleAt(pressRect);
+  if(stroke.mode === 'stretch' && !S.erase) stroke.slice = nextSlice(pressRect);
+  stroke.tiles = {};
+  if(stroke.mode === 'stamp' && !S.followPath) stampAt(p.x, p.y);
+}
+function stampScale(k){ return S.sizeEnd === 1 ? 1 : 1 + (S.sizeEnd - 1) * Math.min(1, k / Math.max(1, S.sizeSteps)); }
+function stampAt(cx, cy){
+  const base = rectAt(cx, cy), key = base.x + ',' + base.y;
+  if(key === stroke.lastKey) return;
+  stroke.lastKey = key;
+  const k = stroke.k++, sc = stampScale(k);
+  const r = sc === 1 ? base : {x:base.x + base.w*(1-sc)/2, y:base.y + base.h*(1-sc)/2, w:base.w*sc, h:base.h*sc};
+  if(r.w < 1 || r.h < 1) return;
+  const o = curOpts(); if(S.followPath) o.angle = stroke.angle;
+  commitPaint(S.erase ? null : nextSlice(r, k), r, o);
+  stroke.prevRect = {x:Math.round(r.x), y:Math.round(r.y), w:Math.max(1, Math.round(r.w)), h:Math.max(1, Math.round(r.h))};
+}
+function dragStroke(p){
+  if(stroke.mode !== 'stamp') return;
+  const fp = footprint();
+  const stepFor = () => Math.max(2, S.spacing * Math.min(fp.w, fp.h) * stampScale(stroke.k));
+  let dx = p.x - stroke.last.x, dy = p.y - stroke.last.y, d = Math.hypot(dx, dy), guard = 0, step = stepFor();
+  if(d > 0.5) stroke.angle = Math.atan2(dy, dx);
+  while(d >= step && guard++ < 4000){
+    stroke.last.x += dx/d*step; stroke.last.y += dy/d*step;
+    stampAt(stroke.last.x, stroke.last.y);
+    dx = p.x - stroke.last.x; dy = p.y - stroke.last.y; d = Math.hypot(dx, dy); step = stepFor();
+  }
+}
+// sample a w×h block centred on (cx, cy), rotated by -θ, so the drag direction becomes +x
+function grabRotated(cx, cy, w, h, th, comp){
+  const c = mk(w, h), g = c.getContext('2d');
+  g.translate(c.width/2, c.height/2); g.rotate(-th); g.translate(-cx, -cy);
+  if(!comp || S.showSrc) g.drawImage(srcC, 0, 0);
+  if(comp) g.drawImage(outC, 0, 0);
+  return {c, sx:0, sy:0, sw:c.width, sh:c.height};
+}
+function stretchFreeGeom(p){
+  const pr = stroke.pressRect, dx = p.x - stroke.start.x, dy = p.y - stroke.start.y, d = Math.hypot(dx, dy);
+  if(d < 1) return null;
+  let th = Math.atan2(dy, dx);
+  if(S.angleSnap) th = Math.round(th / (Math.PI/12)) * (Math.PI/12);
+  const ux = Math.cos(th), uy = Math.sin(th), cx = pr.x + pr.w/2, cy = pr.y + pr.h/2, w = pr.w, h = pr.h;
+  let sl = null;
+  if(!S.erase){
+    if(S.sample === 'press' || S.sample === 'smear'){
+      const key = th.toFixed(4);
+      if(stroke.rotKey !== key){ stroke.rotKey = key; stroke.rotSlice = grabRotated(cx, cy, w, h, th, S.sampleComp || S.sample === 'smear'); }
+      sl = stroke.rotSlice;
+    } else sl = stroke.slice;
+  }
+  let mid, len, slice;
+  if(S.stretchEdge){ mid = w/2 + d/2; len = d; slice = sl ? buildStreak(sl, 'r', Math.max(1, Math.round(len)), h) : null; }
+  else { mid = d/2; len = d + w; slice = sl; }
+  const mx = cx + ux*mid, my = cy + uy*mid;
+  return {r:{x:mx - len/2, y:my - h/2, w:len, h}, slice, angle:th};
+}
+function stretchGeom(p, free){
+  if(S.stretchFree) return stretchFreeGeom(p);
+  const pr = stroke.pressRect, cur = rectAt(p.x, p.y);
+  const dx = p.x - stroke.start.x, dy = p.y - stroke.start.y, horiz = Math.abs(dx) >= Math.abs(dy);
+  const sl = stroke.slice;
+  if(!S.stretchEdge){
+    let r;
+    if(free){ const x0 = Math.min(pr.x,cur.x), y0 = Math.min(pr.y,cur.y);
+      r = {x:x0, y:y0, w:Math.max(pr.x+pr.w,cur.x+cur.w)-x0, h:Math.max(pr.y+pr.h,cur.y+cur.h)-y0}; }
+    else if(horiz){ const x0 = Math.min(pr.x,cur.x); r = {x:x0, y:pr.y, w:Math.max(pr.x+pr.w,cur.x+cur.w)-x0, h:pr.h}; }
+    else { const y0 = Math.min(pr.y,cur.y); r = {x:pr.x, y:y0, w:pr.w, h:Math.max(pr.y+pr.h,cur.y+cur.h)-y0}; }
+    return {r, slice:sl};
+  }
+  let r, dir;
+  if(horiz){
+    if(dx >= 0){ dir = 'r'; r = {x:pr.x+pr.w, y:pr.y, w:(cur.x+cur.w)-(pr.x+pr.w), h:pr.h}; }
+    else { dir = 'l'; r = {x:cur.x, y:pr.y, w:pr.x-cur.x, h:pr.h}; }
+  } else {
+    if(dy >= 0){ dir = 'd'; r = {x:pr.x, y:pr.y+pr.h, w:pr.w, h:(cur.y+cur.h)-(pr.y+pr.h)}; }
+    else { dir = 'u'; r = {x:pr.x, y:cur.y, w:pr.w, h:pr.y-cur.y}; }
+  }
+  if(r.w < 1 || r.h < 1) return null;
+  return {r, slice: sl ? buildStreak(sl, dir, r.w, r.h) : null};
+}
+function rng(seed){ let a = seed >>> 0; return () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+// Edge streak: take an edge band of the slice, stretch it away from the slice, with optional ragged ends and fade.
+function buildStreak(sl, dir, W, H){
+  const horiz = dir === 'r' || dir === 'l';
+  const T = horiz ? sl.sh : sl.sw, depth = horiz ? sl.sw : sl.sh;
+  const ew = Math.max(1, Math.min(Math.round(S.edgeW), depth));
+  // band canvas: stretch axis = x (edge pixel at x = 0), thickness = y
+  const B = mk(ew, T), bg = B.getContext('2d');
+  if(dir === 'l'){ bg.drawImage(sl.c, sl.sx, sl.sy, ew, sl.sh, 0, 0, ew, sl.sh); }
+  else if(dir === 'r'){ bg.setTransform(-1,0,0,1,ew,0); bg.drawImage(sl.c, sl.sx + sl.sw - ew, sl.sy, ew, sl.sh, 0, 0, ew, sl.sh); }
+  else if(dir === 'u'){ bg.setTransform(0,1,1,0,0,0); bg.drawImage(sl.c, sl.sx, sl.sy, sl.sw, ew, 0, 0, sl.sw, ew); }
+  else { bg.setTransform(0,1,-1,0,ew,0); bg.drawImage(sl.c, sl.sx, sl.sy + sl.sh - ew, sl.sw, ew, 0, 0, sl.sw, ew); }
+  // canonical streak: length L along x, thickness Td along y
+  const L = horiz ? W : H, Td = horiz ? H : W;
+  const K = mk(L, Td), kg = K.getContext('2d');
+  kg.imageSmoothingEnabled = ew > 1;
+  if(S.jitter <= 0){ kg.drawImage(B, 0, 0, ew, T, 0, 0, L, Td); }
+  else {
+    const rand = rng(stroke ? stroke.seed : 1), N = Math.max(1, Math.min(Math.round(Td), 600));
+    for(let j = 0; j < N; j++){
+      const len = L * (1 - S.jitter * Math.pow(rand(), 0.8));
+      if(len < 1) continue;
+      kg.drawImage(B, 0, j*T/N, ew, T/N, 0, j*Td/N, len, Td/N + .5);
+    }
+  }
+  if(S.fade > 0){
+    const gr = kg.createLinearGradient(0, 0, L, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, `rgba(0,0,0,${(1 - S.fade).toFixed(3)})`);
+    kg.globalCompositeOperation = 'destination-in'; kg.fillStyle = gr; kg.fillRect(0, 0, L, Td);
+  }
+  // place into the destination orientation
+  const F = mk(W, H), fg = F.getContext('2d');
+  if(dir === 'r') fg.setTransform(1,0,0,1,0,0);
+  else if(dir === 'l') fg.setTransform(-1,0,0,1,W,0);
+  else if(dir === 'd') fg.setTransform(0,1,1,0,0,0);
+  else fg.setTransform(0,-1,1,0,0,H);
+  fg.drawImage(K, 0, 0);
+  return {c:F, sx:0, sy:0, sw:F.width, sh:F.height};
+}
+function drawStretch(ctx, p, free, rec){
+  const g = stretchGeom(p, free); if(!g) return;
+  const o = {rot:0, angle:g.angle || 0, flip:false, shape:S.shape, path:S.shape === 'free' ? S.customPath : null, alpha:S.opacity, erase:S.erase};
+  if(rec) commitPaint(g.slice, g.r, o); else paint(ctx, g.slice, g.r, o);
+}
+function tileRect(p){
+  const a = stroke.start, fp = footprint();
+  let x0 = Math.min(a.x,p.x), x1 = Math.max(a.x,p.x), y0 = Math.min(a.y,p.y), y1 = Math.max(a.y,p.y);
+  if(S.snap){ x0 = Math.floor(x0/S.gw)*S.gw; y0 = Math.floor(y0/S.gh)*S.gh; x1 = Math.ceil(x1/S.gw)*S.gw; y1 = Math.ceil(y1/S.gh)*S.gh; }
+  return {x:x0, y:y0, w:Math.max(fp.w, x1-x0), h:Math.max(fp.h, y1-y0)};
+}
+function tileCells(R, fp){
+  const cells = [];
+  for(let row = 0, y = R.y; y < R.y + R.h; y += fp.h, row++){
+    const off = S.tileLayout === 'brick' && row % 2 ? -fp.w/2 : 0;
+    for(let col = 0, x = R.x + off; x < R.x + R.w; x += fp.w, col++) cells.push({x, y, col, row});
+  }
+  return cells;
+}
+const PINWHEEL = [[0,1],[3,2]];
+function drawTiles(ctx, p, rec){
+  const R = tileRect(p), fp = footprint(), cells = tileCells(R, fp);
+  const key = [R.x, R.y, R.w, R.h, S.tileLayout, S.tilePattern].join(',');
+  if(stroke.tileKey !== key){
+    if(S.tilePattern === 'shuffle'){
+      stroke.tiles = {};
+      const perm = cells.map((_, i) => i), rand = rng(stroke.seed);
+      for(let i = perm.length - 1; i > 0; i--){ const j = Math.floor(rand() * (i + 1)); [perm[i], perm[j]] = [perm[j], perm[i]]; }
+      stroke.perm = perm;
+    }
+    stroke.tileKey = key;
+  }
+  ctx.save(); ctx.beginPath(); ctx.rect(R.x, R.y, R.w, R.h); ctx.clip();
+  cells.forEach((c, i) => {
+    const r = {x:c.x, y:c.y, w:fp.w, h:fp.h}, ck = c.col + ',' + c.row;
+    if(!stroke.tiles[ck]){
+      let slice = null;
+      if(!S.erase){
+        if(S.tilePattern === 'shuffle'){ const src = cells[stroke.perm[i]]; slice = sampleAt({x:src.x, y:src.y, w:fp.w, h:fp.h}); }
+        else if(S.sample === 'buffer') slice = buffer[Math.min(bufIdx, buffer.length-1)];
+        else if(S.sample === 'random') slice = sampleAt(randomRect(fp.w, fp.h));
+        else slice = stroke.slice;
+      }
+      const o = curOpts();
+      if(S.tilePattern === 'rotate') o.rot = (S.rot + PINWHEEL[c.row % 2][((c.col % 2) + 2) % 2]) % 4;
+      if(S.tilePattern === 'mirror'){ o.flip = (c.col % 2 === 1) !== o.flip; o.flipY = c.row % 2 === 1; }
+      stroke.tiles[ck] = {slice, o};
+    }
+    paint(ctx, stroke.tiles[ck].slice, r, stroke.tiles[ck].o);
+    if(rec) recordOp(stroke.tiles[ck].slice, r, stroke.tiles[ck].o, R);
+  });
+  ctx.restore();
+}
+function endStroke(p, free){
+  if(stroke.mode === 'stretch') drawStretch(outCtx(), p, free, true);
+  if(stroke.mode === 'tile'){
+    drawTiles(outCtx(), p, true);
+  }
+  stroke = null;
+  renderBuffer();
+}
+function capture(p){
+  if(buffer.length >= BUF_MAX){ toast(t('stashFull', BUF_MAX)); return; }
+  const r = clampSrc(rectAt(p.x, p.y));
+  buffer.push(sampleAt(r));
+  flash = {r, t:performance.now()};
+  bufIdx = buffer.length - 1;
+  if(S.sample !== 'buffer'){ S.sample = 'buffer'; savePrefs(); syncUI(); }
+  renderBuffer();
+  toast(t('stored', buffer.length));
+}
+
+/* ---------- image loading ---------- */
+function clearOut(){ outCtx().clearRect(0,0,docW,docH); ops = []; }
+function resetSession(){ buffer = []; bufIdx = 0; undoStack = []; renderBuffer(); }
+function useImage(img, name){
+  let w = img.naturalWidth, h = img.naturalHeight;
+  const k = Math.min(1, MAX_SIDE / Math.max(w,h));
+  setDoc(Math.round(w*k), Math.round(h*k));
+  srcC.getContext('2d').drawImage(img, 0, 0, docW, docH);
+  clearOut(); resetSession(); docName = name; isSample = false; fitView(); syncUI();
+  toast(t('loaded', name));
+}
+function loadFile(file){
+  if(!file || !/^image\/(png|jpe?g|webp)$/.test(file.type)){ toast(t('badType')); return; }
+  const url = URL.createObjectURL(file), img = new Image();
+  img.onload = () => { useImage(img, file.name); URL.revokeObjectURL(url); };
+  img.onerror = () => toast(t('badFile'));
+  img.src = url;
+}
+
+function makeSample(){
+  // editorial type poster: grey grotesque display, italic serif numerals, small caps notes
+  setDoc(1200, 1670);
+  const g = srcC.getContext('2d');
+  const BG = '#f6f6f4', INK = '#6a6a68', SANS = '"Instrument Sans","Noto Sans TC",sans-serif', SERIF = '"Instrument Serif",serif', TC = '"Noto Sans TC",sans-serif';
+  g.fillStyle = BG; g.fillRect(0, 0, docW, docH);
+  g.strokeStyle = '#d4d4d1'; g.lineWidth = 1.5; g.strokeRect(9, 9, docW - 18, docH - 18);
+  g.fillStyle = INK; g.textBaseline = 'alphabetic';
+  const ls = v => { if('letterSpacing' in g) g.letterSpacing = v; };
+  const fit = (text, weight, width, family = SANS) => { g.font = `${weight} 100px ${family}`; return 100 * width / g.measureText(text).width; };
+  const big = (text, x, y, width, align = 'left') => {
+    ls('-6px'); const size = fit(text, 700, width); g.font = `700 ${size}px ${SANS}`; g.textAlign = align; g.fillText(text, x, y); ls('0px'); return size;
+  };
+  const serif = (text, x, y, size, align = 'left') => { g.font = `italic 400 ${size}px ${SERIF}`; g.textAlign = align; g.fillText(text, x, y); };
+
+  big('SLICE', 14, 238, 600);
+  serif('(2026)', 1180, 190, 170, 'right');
+  serif('02/', 22, 390, 170);
+  big('COLLAGE', 1186, 400, 790, 'right');
+  big('BENCH', 14, 568, 700);
+  serif('(  )', 740, 568, 200);
+  g.font = `600 30px ${SANS}`; g.textAlign = 'left'; g.fillText('™', 790, 470);
+
+  // small notes, left column
+  g.font = `700 17px ${SANS}`; ls('-0.3px');
+  ['A GRID TOOL THAT TURNS', 'SLICES OF ANY IMAGE', 'INTO NEW MATERIAL'].forEach((t, i) => g.fillText(t, 42, 700 + i*20));
+  ls('0px');
+  serif('( 01 )', 42, 820, 20);
+  serif('( 02 )', 42, 985, 20);
+
+  // heading, right column
+  const cx = 545;
+  g.font = `700 44px ${SANS}`; ls('-1.2px');
+  ['CUT,', 'REPEAT,', 'REASSEMBLE.'].forEach((t, i) => g.fillText(t, cx, 700 + i*48));
+  ls('0px');
+
+  // body copy, right column
+  const lines = [
+    ['從任何一張圖裡框出一塊區域，', TC], ['它就是你的筆刷。', TC], null,
+    ['沿著網格蓋印、拉伸、平鋪，', TC], ['把原圖拆開，再組成新的構成。', TC], null,
+    ['MODES: STAMP / STRETCH / TILE', SANS, true],
+    ['SAMPLING: PRESS / SMEAR / BUFFER', SANS, true],
+    ['GRID: 40 × 40 PX', SANS, true], null,
+    ['按住 Shift 點擊收集切片，', TC], ['用數字鍵 1–9 選用其中一片。', TC], null,
+    ['Cut freely.', SANS], ['Slice Collage Lab', SANS]
+  ];
+  let y = 985;
+  lines.forEach(l => {
+    if(!l){ y += 22; return; }
+    g.font = `400 27px ${l[1]}`; g.fillText(l[0], cx, y);
+    if(l[2]){ const w = g.measureText(l[0]).width, k = l[0].indexOf(':'); const x0 = cx + g.measureText(l[0].slice(0, k + 2)).width;
+      g.fillRect(x0, y + 5, w - (x0 - cx), 1.5); }
+    y += 33;
+  });
+  docName = ''; isSample = true;
+}
+function runDemo(){
+  // the empty lower-left column becomes a small collage made from the headline
+  newSid('stretch');
+  commitPaint({c:srcC, sx:14, sy:150, sw:470, sh:1}, {x:42, y:1050, w:440, h:200}, {rot:0, flip:false, shape:'rect', alpha:1});
+  newSid('tile');
+  for(let r = 0; r < 3; r++) for(let c = 0; c < 4; c++){
+    const sx = 20 + Math.floor(Math.random()*20)*50, sy = 40 + Math.floor(Math.random()*9)*55;
+    commitPaint({c:srcC, sx, sy, sw:110, sh:110}, {x:42 + c*110, y:1270 + r*110, w:110, h:110},
+      {rot:Math.floor(Math.random()*4), flip:false, shape:(r + c) % 5 === 2 ? 'ellipse' : 'rect', alpha:1});
+  }
+}
+function loadSample(withDemo){
+  makeSample(); clearOut(); resetSession();
+  if(withDemo) runDemo();
+  fitView(); syncUI();
+}
+
+/* ---------- export ---------- */
+/* ---------- SVG export (opens in Illustrator: one clip group per slice, one group per stroke) ---------- */
+const fx = v => +(+v).toFixed(2);
+function shapeSVG(shape, w, h, attrs = '', path){
+  if(shape === 'free'){
+    const P = pathPts(path);
+    if(P){
+      let d = `M${fx(P[0].x*w)},${fx(P[0].y*h)}`;
+      P.forEach((a, i) => { const b = P[(i+1) % P.length]; d += ` C${fx((a.x+a.ox)*w)},${fx((a.y+a.oy)*h)} ${fx((b.x+b.ix)*w)},${fx((b.y+b.iy)*h)} ${fx(b.x*w)},${fx(b.y*h)}`; });
+      return `<path d="${d} Z"${attrs}/>`;
+    }
+    shape = 'rect';
+  }
+  const a = fx(w/2), b = fx(h/2);
+  if(shape === 'ellipse') return `<ellipse cx="0" cy="0" rx="${a}" ry="${b}"${attrs}/>`;
+  if(shape === 'tri') return `<polygon points="0,${-b} ${a},${b} ${-a},${b}"${attrs}/>`;
+  if(shape === 'diamond') return `<polygon points="0,${-b} ${a},0 0,${b} ${-a},0"${attrs}/>`;
+  return `<rect x="${-a}" y="${-b}" width="${fx(w)}" height="${fx(h)}"${attrs}/>`;
+}
+function buildSVG(){
+  const defs = [], cache = new Map(); let uid = 0;
+  const dataFor = sl => {
+    let m = cache.get(sl.c); if(!m){ m = new Map(); cache.set(sl.c, m); }
+    const k = [sl.sx, sl.sy, sl.sw, sl.sh].join(',');
+    if(!m.has(k)){ const c = mk(sl.sw, sl.sh); c.getContext('2d').drawImage(sl.c, sl.sx, sl.sy, sl.sw, sl.sh, 0, 0, c.width, c.height); m.set(k, c.toDataURL('image/png')); }
+    return m.get(k);
+  };
+  const xf = op => {
+    const {r, o} = op, deg = o.rot*90 + o.angle*180/Math.PI;
+    let tf = `translate(${fx(r.x + r.w/2)} ${fx(r.y + r.h/2)})`;
+    if(Math.abs(deg) > 1e-4) tf += ` rotate(${fx(deg)})`;
+    if(o.flip || o.flipY) tf += ` scale(${o.flip ? -1 : 1} ${o.flipY ? -1 : 1})`;
+    const odd = o.rot % 2; return {tf, dw: odd ? r.h : r.w, dh: odd ? r.w : r.h};
+  };
+  const sliceSVG = op => {
+    const {tf, dw, dh} = xf(op);
+    let clip = '';
+    if(op.o.shape !== 'rect'){ const id = 'clip' + (++uid); defs.push(`<clipPath id="${id}">${shapeSVG(op.o.shape, dw, dh, '', op.o.path)}</clipPath>`); clip = ` clip-path="url(#${id})"`; }
+    const op_ = op.o.alpha < 1 ? ` opacity="${fx(op.o.alpha)}"` : '';
+    return `<g transform="${tf}"${op_}><image x="${fx(-dw/2)}" y="${fx(-dh/2)}" width="${fx(dw)}" height="${fx(dh)}" preserveAspectRatio="none" xlink:href="${dataFor(op.slice)}"${clip}/></g>`;
+  };
+  // group ops into strokes
+  const runs = [];
+  ops.forEach(op => { const last = runs[runs.length-1]; if(last && last.sid === op.sid) last.ops.push(op); else runs.push({sid:op.sid, mode:op.mode, ops:[op]}); });
+  let body = '', n = 0;
+  runs.forEach(run => {
+    n++;
+    const name = `stroke-${String(n).padStart(3,'0')}_${run.mode}`;
+    if(run.mode === 'erase'){
+      const id = 'erase' + (++uid);
+      const shapes = run.ops.map(op => { const {tf, dw, dh} = xf(op); return `<g transform="${tf}">${shapeSVG(op.o.shape, dw, dh, ` fill="#000" fill-opacity="${fx(op.o.alpha)}"`, op.o.path)}</g>`; }).join('');
+      defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${docW}" height="${docH}"><rect x="0" y="0" width="${docW}" height="${docH}" fill="#fff"/>${shapes}</mask>`);
+      body = `<g id="${name}" mask="url(#${id})">${body}</g>`;
+      return;
+    }
+    const items = run.ops.filter(op => op.slice).map(sliceSVG).join('');
+    const clipR = run.ops[0].clip;
+    let clip = '';
+    if(clipR){ const id = 'area' + (++uid); defs.push(`<clipPath id="${id}"><rect x="${fx(clipR.x)}" y="${fx(clipR.y)}" width="${fx(clipR.w)}" height="${fx(clipR.h)}"/></clipPath>`); clip = ` clip-path="url(#${id})"`; }
+    body += `<g id="${name}"${clip}>${items}</g>`;
+  });
+  const src = S.showSrc ? `<g id="source"><image x="0" y="0" width="${docW}" height="${docH}" xlink:href="${srcC.toDataURL('image/png')}"/></g>` : '';
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" width="${docW}px" height="${docH}px" viewBox="0 0 ${docW} ${docH}"><defs>${defs.join('')}</defs>${src}<g id="collage">${body}</g></svg>`;
+}
+function stampName(ext){ const d = new Date(), pad = n => String(n).padStart(2,'0'); return `slice-collage-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.${ext}`; }
+async function saveBlob(blob, name, preview){
+  if(downloads){
+    try{ await downloads.save({filename:name, data:blob}); toast(t('exported', name)); return; }
+    catch(err){
+      const code = err && err.code;
+      if(code === 'declined'){ toast(t('exportCancel')); return; }
+      if(code === 'rate_limited'){ toast(t('exportBusy')); return; }
+    }
+  }
+  if(!downloads){
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    toast(t('exported', name)); return;
+  }
+  const url = URL.createObjectURL(blob);
+  $('modalImg').src = preview || url; $('modalLink').href = url; $('modalLink').download = name; $('modalLink').textContent = t(name.endsWith('.svg') ? 'modalLinkSvg' : name.endsWith('.zip') ? 'modalLinkPsd' : 'modalLink');
+  $('modal').hidden = false;
+}
+/* ---------- PSD export: one raster layer per stroke, packed in a ZIP (the save dialog only accepts common file types) ---------- */
+let agLoading = null;
+function loadAgPsd(){
+  if(window.agPsd) return Promise.resolve(window.agPsd);
+  if(!agLoading) agLoading = new Promise((res, rej) => {
+    const sc = document.createElement('script');
+    sc.src = 'lib/ag-psd.js';
+    sc.onload = () => window.agPsd ? res(window.agPsd) : rej(new Error('missing'));
+    sc.onerror = () => { agLoading = null; rej(new Error('load')); };
+    document.head.appendChild(sc);
+  });
+  return agLoading;
+}
+function opBounds(op){
+  const r = op.r, hd = Math.hypot(r.w, r.h)/2, cx = r.x + r.w/2, cy = r.y + r.h/2;
+  let b = {x0:cx - hd, y0:cy - hd, x1:cx + hd, y1:cy + hd};
+  if(op.clip){ const c = op.clip; b = {x0:Math.max(b.x0, c.x), y0:Math.max(b.y0, c.y), x1:Math.min(b.x1, c.x + c.w), y1:Math.min(b.y1, c.y + c.h)}; }
+  return b;
+}
+function boxesHit(a, b){ return a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1; }
+// perSlice: every slice is its own layer, grouped per stroke. Otherwise one layer per stroke.
+function buildPsdLayers(perSlice){
+  const runs = [];
+  ops.forEach(op => { const last = runs[runs.length-1]; if(last && last.sid === op.sid) last.ops.push(op); else runs.push({sid:op.sid, mode:op.mode, ops:[op]}); });
+  const top = [], all = []; let n = 0, k = 0;
+  const rasterize = list => {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    list.forEach(op => { const b = opBounds(op); x0 = Math.min(x0, b.x0); y0 = Math.min(y0, b.y0); x1 = Math.max(x1, b.x1); y1 = Math.max(y1, b.y1); });
+    x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(docW, Math.ceil(x1)); y1 = Math.min(docH, Math.ceil(y1));
+    if(!(x1 > x0 && y1 > y0)) return null;
+    const c = mk(x1 - x0, y1 - y0), g = c.getContext('2d');
+    g.translate(-x0, -y0);
+    list.forEach(op => {
+      g.save();
+      if(op.clip){ g.beginPath(); g.rect(op.clip.x, op.clip.y, op.clip.w, op.clip.h); g.clip(); }
+      paint(g, op.slice, op.r, op.o);
+      g.restore();
+    });
+    return {canvas:c, left:x0, top:y0, box:{x0, y0, x1, y1}};
+  };
+  runs.forEach(run => {
+    n++;
+    if(run.mode === 'erase'){
+      run.ops.forEach(op => {
+        const eb = opBounds(op);
+        all.forEach(L => {
+          if(!boxesHit(eb, L.box)) return;
+          const g = L.canvas.getContext('2d'); g.save(); g.translate(-L.left, -L.top); paint(g, null, op.r, {...op.o, erase:true}); g.restore();
+        });
+      });
+      return;
+    }
+    const name = `stroke-${String(n).padStart(3,'0')}_${run.mode}`;
+    const list = run.ops.filter(op => op.slice);
+    if(!perSlice){
+      const L = rasterize(list); if(!L) return;
+      L.name = name; top.push(L); all.push(L); return;
+    }
+    const group = {name, opened:false, children:[]};
+    list.forEach(op => {
+      const L = rasterize([op]); if(!L) return;
+      L.name = `slice-${String(++k).padStart(4,'0')}`; group.children.push(L); all.push(L);
+    });
+    if(group.children.length) top.push(group);
+  });
+  all.forEach(L => { delete L.box; });
+  return top;
+}
+const CRC_T = (() => { const t = new Uint32Array(256); for(let n = 0; n < 256; n++){ let c = n; for(let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8){ let c = 0xFFFFFFFF; for(let i = 0; i < u8.length; i++) c = CRC_T[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zipOne(name, data){
+  const nm = new TextEncoder().encode(name), crc = crc32(data), size = data.length;
+  const lh = new DataView(new ArrayBuffer(30)); lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+  lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, nm.length, true);
+  const ch = new DataView(new ArrayBuffer(46)); ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+  ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, 0, true);
+  const cdOff = 30 + nm.length + size, cdLen = 46 + nm.length;
+  const end = new DataView(new ArrayBuffer(22)); end.setUint32(0, 0x06054b50, true); end.setUint16(8, 1, true); end.setUint16(10, 1, true); end.setUint32(12, cdLen, true); end.setUint32(16, cdOff, true);
+  return new Blob([lh.buffer, nm, data, ch.buffer, nm, end.buffer], {type:'application/zip'});
+}
+const PSD_WARN = 120;
+async function exportPSD(){
+  if(!ops.some(op => op.slice) && !S.showSrc){ toast(t('psdEmpty')); return; }
+  const count = ops.filter(op => op.slice).length;
+  let perSlice = true;
+  if(count >= PSD_WARN){
+    const strokes = new Set(ops.filter(op => op.slice).map(op => op.sid)).size;
+    const v = await askDialog(t('psdDlgTitle'), t('psdDlgText', count, strokes),
+      [{value:'cancel', label:t('cancel')}, {value:'stroke', label:t('psdPerStroke', strokes)}, {value:'slice', label:t('psdPerSlice', count), primary:true}]);
+    if(v === 'cancel') return;
+    perSlice = v === 'slice';
+  }
+  toast(t('psdBuilding'));
+  let ag;
+  try{ ag = await loadAgPsd(); }catch(e){ toast(t('psdLoadFail')); return; }
+  await new Promise(r => setTimeout(r, 30));
+  const comp = mk(docW, docH), cg = comp.getContext('2d');
+  if(S.showSrc) cg.drawImage(srcC, 0, 0);
+  cg.drawImage(outC, 0, 0);
+  const children = [];
+  if(S.showSrc){ const sc = mk(docW, docH); sc.getContext('2d').drawImage(srcC, 0, 0); children.push({name:'source', canvas:sc, left:0, top:0}); }
+  children.push({name:'collage', opened:true, children:buildPsdLayers(perSlice)});
+  const buf = ag.writePsd({width:docW, height:docH, children, canvas:comp});
+  const base = stampName('psd');
+  if(downloads) await saveBlob(zipOne(base, new Uint8Array(buf)), base.replace(/\.psd$/, '.zip'), comp.toDataURL('image/png'));
+  else await saveBlob(new Blob([buf], {type:'image/vnd.adobe.photoshop'}), base);
+}
+
+function askDialog(title, text, buttons){
+  return new Promise(res => {
+    $('dlgTitle').textContent = title; $('dlgText').textContent = text;
+    const row = $('dlgBtns'); row.textContent = '';
+    const done = v => { $('dlg').hidden = true; document.removeEventListener('keydown', onKey, true); res(v); };
+    const onKey = e => { if(e.key === 'Escape'){ e.stopPropagation(); done('cancel'); } };
+    buttons.forEach(bt => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (bt.primary ? ' dark' : ''); b.textContent = bt.label; b.addEventListener('click', () => done(bt.value)); row.appendChild(b); });
+    document.addEventListener('keydown', onKey, true);
+    $('dlg').hidden = false; row.lastChild.focus();
+  });
+}
+
+/* ---------- free shape pen editor (normalised path, -0.5..0.5, absolute handle offsets) ---------- */
+const A = (x, y, ix = 0, iy = 0, ox = 0, oy = 0) => ({x, y, ix, iy, ox, oy});
+const PEN_PRESETS = {
+  circle: (() => { const k = 0.2761; return [A(0,-.5,-k,0,k,0), A(.5,0,0,-k,0,k), A(0,.5,k,0,-k,0), A(-.5,0,0,k,0,-k)]; })(),
+  blob: [A(0,-.45,-.3,0,.25,0), A(.45,-.05,0,-.3,0,.25), A(.05,.48,.3,0,-.3,0), A(-.42,.1,0,.25,0,-.35)],
+  leaf: [A(0,-.5,-.5,.35,.5,.35), A(0,.5,.5,-.35,-.5,-.35)],
+  trap: [A(-.3,-.5), A(.3,-.5), A(.5,.5), A(-.5,.5)],
+  para: [A(-.2,-.5), A(.5,-.5), A(.2,.5), A(-.5,.5)],
+  thorn: [A(0,-.5), A(.2,.5), A(-.2,.5)],
+  shard: [A(-.05,-.5), A(.38,-.1), A(.12,.5), A(-.42,.28), A(-.22,-.05)],
+  chevron: [A(-.5,-.5), A(-.1,-.5), A(.5,0), A(-.1,.5), A(-.5,.5), A(.1,0)],
+  arrow: [A(-.5,-.15), A(.1,-.15), A(.1,-.45), A(.5,0), A(.1,.45), A(.1,.15), A(-.5,.15)],
+  bolt: [A(.1,-.5), A(-.35,.08), A(-.02,.08), A(-.15,.5), A(.35,-.12), A(.03,-.12)],
+  zigzag: [A(-.5,-.2), A(-.25,-.5), A(0,-.2), A(.25,-.5), A(.5,-.2), A(.5,.5), A(-.5,.5)],
+  spike: Array.from({length:16}, (_, i) => { const a = -Math.PI/2 + i*Math.PI/8, r = i % 2 ? .12 : .5; return A(+(Math.cos(a)*r).toFixed(3), +(Math.sin(a)*r).toFixed(3)); }),
+  star: Array.from({length:10}, (_, i) => { const a = -Math.PI/2 + i*Math.PI/5, r = i % 2 ? .2 : .5; return A(+(Math.cos(a)*r).toFixed(3), +(Math.sin(a)*r).toFixed(3)); })
+};
+if(!Array.isArray(S.customPath)) S.customPath = PEN_PRESETS.blob.map(p => ({...p}));
+let pen = {sel:-1, drag:null};
+const PEN_PAD = 0.16;
+function penMetrics(){
+  const cv = $('penCv'), r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  const size = Math.max(10, Math.round(r.width));
+  if(cv.width !== size*dpr){ cv.width = size*dpr; cv.height = size*dpr; }
+  const box = size * (1 - PEN_PAD*2), o = size/2;
+  return {cv, dpr, size, box, o, toPx:(x, y) => [o + x*box, o + y*box], toN:(px, py) => [(px - o)/box, (py - o)/box]};
+}
+function drawPen(){
+  const cv = $('penCv'); if(!cv || cv.offsetParent === null) return;
+  const m = penMetrics(), g = cv.getContext('2d'), P = S.customPath;
+  g.setTransform(m.dpr, 0, 0, m.dpr, 0, 0); g.clearRect(0, 0, m.size, m.size);
+  const [bx, by] = m.toPx(-.5, -.5);
+  g.setLineDash([3, 3]); g.strokeStyle = '#c9c8c3'; g.lineWidth = 1; g.strokeRect(bx + .5, by + .5, m.box, m.box); g.setLineDash([]);
+  if(P.length >= 2){
+    g.beginPath(); const [x0, y0] = m.toPx(P[0].x, P[0].y); g.moveTo(x0, y0);
+    const closed = pathClosed(P), segs = closed ? P.length : P.length - 1;
+    for(let i = 0; i < segs; i++){ const a = P[i], b = P[(i+1) % P.length];
+      const c1 = m.toPx(a.x+a.ox, a.y+a.oy), c2 = m.toPx(b.x+b.ix, b.y+b.iy), e = m.toPx(b.x, b.y); g.bezierCurveTo(c1[0], c1[1], c2[0], c2[1], e[0], e[1]); }
+    if(closed){ g.closePath(); g.fillStyle = 'rgba(255,61,154,.12)'; g.fill(); }
+    g.strokeStyle = '#43423f'; g.lineWidth = 1.25; g.stroke();
+  }
+  P.forEach((a, i) => {
+    const [x, y] = m.toPx(a.x, a.y);
+    if(i === pen.sel){
+      g.strokeStyle = '#ff3d9a'; g.lineWidth = 1; g.fillStyle = '#fff';
+      [[a.ix, a.iy], [a.ox, a.oy]].forEach(([hx, hy]) => { if(!hx && !hy) return; const [qx, qy] = m.toPx(a.x+hx, a.y+hy);
+        g.beginPath(); g.moveTo(x, y); g.lineTo(qx, qy); g.stroke(); g.beginPath(); g.arc(qx, qy, 3.5, 0, Math.PI*2); g.fill(); g.stroke(); });
+    }
+    g.fillStyle = i === pen.sel ? '#ff3d9a' : '#fff'; g.strokeStyle = i === pen.sel ? '#ff3d9a' : '#43423f'; g.lineWidth = 1.25;
+    g.fillRect(x - 3.5, y - 3.5, 7, 7); g.strokeRect(x - 3.5, y - 3.5, 7, 7);
+  });
+}
+function penCommit(){ savePrefs(); drawPen(); renderLib(); }
+const LIB_MAX = 24;
+const samePath = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function renderLib(){
+  const el = $('shapeLib'); if(!el) return; el.textContent = '';
+  if(!Array.isArray(S.shapeLib)) S.shapeLib = [];
+  $('libCount').textContent = `${S.shapeLib.length} / ${LIB_MAX}`;
+  if(!S.shapeLib.length){ const e = document.createElement('span'); e.className = 'empty'; e.textContent = t('libEmpty'); el.appendChild(e); return; }
+  S.shapeLib.forEach((path, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'slot' + (samePath(path, S.customPath) ? ' on' : '');
+    b.title = t('libItem', i+1); b.setAttribute('aria-label', t('libItem', i+1));
+    const c = mk(96, 96), g = c.getContext('2d');
+    g.translate(48, 48); g.fillStyle = '#43423f'; shapePath(g, 'free', 70, 70, path); g.fill();
+    b.appendChild(c);
+    b.addEventListener('click', () => { S.customPath = path.map(p => ({...p})); pen.sel = -1; if(S.shape !== 'free') S.shape = 'free'; penCommit(); syncUI(); toast(t('libLoaded', i+1)); });
+    b.addEventListener('contextmenu', e => { e.preventDefault(); S.shapeLib = S.shapeLib.filter((_, j) => j !== i); penCommit(); toast(t('libRemoved', i+1)); });
+    el.appendChild(b);
+  });
+}
+function bindPen(){
+  const cv = $('penCv');
+  const local = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => {
+    e.preventDefault(); cv.focus(); cv.setPointerCapture(e.pointerId);
+    const m = penMetrics(), [px, py] = local(e), P = S.customPath.map(p => ({...p}));
+    S.customPath = P;  // new array: earlier strokes keep their own copy of the shape
+    const near = (x, y) => Math.hypot(px - x, py - y) <= 7;
+    if(pen.sel >= 0 && P[pen.sel]){
+      const a = P[pen.sel];
+      for(const side of ['i', 'o']){ const hx = a[side+'x'], hy = a[side+'y']; if(!hx && !hy) continue;
+        const [qx, qy] = m.toPx(a.x+hx, a.y+hy); if(near(qx, qy)){ pen.drag = {type:'h', side, i:pen.sel}; drawPen(); return; } }
+    }
+    for(let i = P.length - 1; i >= 0; i--){ const [x, y] = m.toPx(P[i].x, P[i].y); if(near(x, y)){ pen.sel = i; pen.drag = {type:'a', i, sx:px, sy:py, ox:P[i].x, oy:P[i].y}; drawPen(); return; } }
+    const [nx, ny] = m.toN(px, py);
+    const ins = pen.sel >= 0 ? pen.sel + 1 : P.length;
+    P.splice(ins, 0, A(+nx.toFixed(4), +ny.toFixed(4)));
+    pen.sel = ins; pen.drag = {type:'new', i:ins, sx:px, sy:py};
+    drawPen();
+  });
+  cv.addEventListener('pointermove', e => {
+    if(!pen.drag) return;
+    const m = penMetrics(), [px, py] = local(e), [nx, ny] = m.toN(px, py), a = S.customPath[pen.drag.i]; if(!a) return;
+    if(pen.drag.type === 'a'){ a.x = pen.drag.ox + (px - pen.drag.sx)/m.box; a.y = pen.drag.oy + (py - pen.drag.sy)/m.box; }
+    else if(pen.drag.type === 'new'){ if(Math.hypot(px - pen.drag.sx, py - pen.drag.sy) > 3){ a.ox = nx - a.x; a.oy = ny - a.y; a.ix = -a.ox; a.iy = -a.oy; } }
+    else { const s = pen.drag.side, o = s === 'i' ? 'o' : 'i'; a[s+'x'] = nx - a.x; a[s+'y'] = ny - a.y;
+      if(!e.altKey){ const len = Math.hypot(a[o+'x'], a[o+'y']) || Math.hypot(a[s+'x'], a[s+'y']), d = Math.hypot(a[s+'x'], a[s+'y']) || 1;
+        a[o+'x'] = -a[s+'x']/d*len; a[o+'y'] = -a[s+'y']/d*len; } }
+    drawPen();
+  });
+  const end = () => { if(pen.drag){ pen.drag = null; penCommit(); } };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('dblclick', e => {
+    const m = penMetrics(), [px, py] = local(e), P = S.customPath;
+    const i = P.findIndex(p => { const [x, y] = m.toPx(p.x, p.y); return Math.hypot(px - x, py - y) <= 7; });
+    if(i < 0) return;
+    S.customPath = P.map(p => ({...p})); const a = S.customPath[i];
+    if(a.ix || a.iy || a.ox || a.oy){ a.ix = a.iy = a.ox = a.oy = 0; }
+    else { const n = S.customPath.length, pv = S.customPath[(i-1+n) % n], nx = S.customPath[(i+1) % n];
+      const dx = (nx.x - pv.x)/6, dy = (nx.y - pv.y)/6; a.ox = dx; a.oy = dy; a.ix = -dx; a.iy = -dy; }
+    pen.sel = i; penCommit();
+  });
+  cv.addEventListener('keydown', e => {
+    if((e.key === 'Delete' || e.key === 'Backspace') && pen.sel >= 0){
+      e.preventDefault(); e.stopPropagation();
+      S.customPath = S.customPath.filter((_, i) => i !== pen.sel); pen.sel = Math.min(pen.sel, S.customPath.length - 1); penCommit();
+    }
+    if(e.key === 'Escape'){ pen.sel = -1; drawPen(); }
+  });
+  const grid = $('presetGrid');
+  ['blob','circle','leaf','star','trap','para','thorn','shard','chevron','arrow','bolt','zigzag','spike'].forEach(k => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'slot'; b.dataset.tip = 'pr_' + k;
+    const c = mk(96, 96), g = c.getContext('2d'); g.translate(48, 48); g.fillStyle = '#43423f'; shapePath(g, 'free', 66, 66, PEN_PRESETS[k]); g.fill();
+    b.appendChild(c);
+    b.addEventListener('click', () => { S.customPath = PEN_PRESETS[k].map(p => ({...p})); pen.sel = -1; penCommit(); });
+    grid.appendChild(b);
+  });
+  $('libSave').addEventListener('click', () => {
+    if(!pathClosed(S.customPath)){ toast(t('libNeed')); return; }
+    if(!Array.isArray(S.shapeLib)) S.shapeLib = [];
+    if(S.shapeLib.length >= LIB_MAX){ toast(t('libFull', LIB_MAX)); return; }
+    S.shapeLib = [...S.shapeLib, S.customPath.map(p => ({...p}))]; penCommit(); toast(t('libSaved', S.shapeLib.length));
+  });
+  $('libSave').dataset.tip = 'libSave'; $('shapeLib').dataset.tip = 'shapeLib';
+  renderLib();
+  $('penClear').addEventListener('click', () => { S.customPath = []; pen.sel = -1; penCommit(); toast(t('penCleared')); });
+  new ResizeObserver(() => drawPen()).observe(cv);
+}
+
+/* ---------- tooltips ---------- */
+let tipTimer = null;
+function hideTip(){ clearTimeout(tipTimer); $('tip').hidden = true; }
+function bindTips(){
+  const map = {btnLang:'lang', btnTips:'tips', btnLoad:'load', btnSvg:'exportSvg', btnPsd:'exportPsd', btnExport:'exportPng', gridPill:'gridPill',
+    btnRot:'rot', btnClearBuf:'clearStash', btnUndo:'undo', btnClear:'clearCanvas', btnSample:'sampleImg', buf:'stash'};
+  Object.entries(map).forEach(([id, k]) => { $(id).dataset.tip = k; });
+  CHECKS.forEach(k => { const sw = $(k).closest('.sw'); if(sw) sw.dataset.tip = k; });
+  Object.keys(NUM).forEach(k => { const row = $(k).closest('.slider'); if(row) row.dataset.tip = k; });
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest && e.target.closest('[data-tip]');
+    if(!S.tips || !el || matchMedia('(hover: none)').matches){ hideTip(); return; }
+    clearTimeout(tipTimer);
+    tipTimer = setTimeout(() => {
+      const tip = $('tip'); tip.textContent = t('tip_' + el.dataset.tip); tip.hidden = false;
+      const b = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
+      let x = b.left + b.width/2 - w/2, y = b.bottom + 8;
+      if(y + h > innerHeight - 8) y = b.top - h - 8;
+      x = Math.max(8, Math.min(innerWidth - w - 8, x));
+      tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    }, 350);
+  });
+  document.addEventListener('mousedown', hideTip);
+}
+
+async function exportSVG(){
+  if(!ops.some(op => op.slice) && !S.showSrc){ toast(t('svgEmpty')); return; }
+  toast(t('svgBuilding'));
+  await new Promise(r => setTimeout(r, 30));
+  const blob = new Blob([buildSVG()], {type:'image/svg+xml'});
+  await saveBlob(blob, stampName('svg'));
+}
+async function exportPNG(){
+  const c = mk(docW, docH), g = c.getContext('2d');
+  if(S.showSrc) g.drawImage(srcC, 0, 0);
+  g.drawImage(outC, 0, 0);
+  const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+  await saveBlob(blob, stampName('png'));
+}
+
+/* ---------- UI ---------- */
+let toastTimer;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.hidden = false; t.style.opacity = 1;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.opacity = 0; setTimeout(() => t.hidden = true, 200); }, 1800);
+}
+function buildSeg(key, list){
+  const el = document.querySelector(`.tabs[data-key="${key}"]`);
+  list.forEach(([v,l]) => {
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = GLYPH[v] && key === 'shape' ? GLYPH[v] : l; b.title = l; b.setAttribute('aria-label', l); b.dataset.val = v;
+    b.addEventListener('click', () => { S[key] = v; if(key === 'gridView') S.gridOn = true; syncUI(); savePrefs(); });
+    el.appendChild(b);
+  });
+}
+const spFromSlider = v => +(0.05*Math.pow(400, v/1000)).toFixed(2);
+const spToSlider = sp => Math.round(1000*Math.log(Math.max(.05,sp)/0.05)/Math.log(400));
+const NUM = {
+  bw:{min:4,max:2000,step:1,u:'px'}, bh:{min:4,max:2000,step:1,u:'px'}, spacing:{min:0.05,max:20,step:0.05,u:'×'}, opacity:{min:5,max:100,step:1,u:'%',pct:1},
+  edgeW:{min:1,max:60,step:1,u:'px'}, fade:{min:0,max:100,step:1,u:'%',pct:1}, jitter:{min:0,max:100,step:1,u:'%',pct:1},
+  sizeEnd:{min:10,max:300,step:5,u:'%',pct:1}, sizeSteps:{min:2,max:200,step:1,u:''}, driftX:{min:-500,max:500,step:1,u:'px'}, driftY:{min:-500,max:500,step:1,u:'px'},
+  gw:{min:4,max:400,step:1,u:'px'}, gh:{min:4,max:400,step:1,u:'px'}
+};
+function syncNum(k, force){
+  const el = $(k + 'Out'); if(!el || (!force && document.activeElement === el)) return;
+  const c = NUM[k], v = S[k];
+  el.value = c.pct ? Math.round(v*100) : (k === 'spacing' ? +(+v).toFixed(2) : Math.round(v));
+}
+const RANGES = {sizeEnd:v=>Math.round(v*100)+'%', sizeSteps:v=>v+'', driftX:v=>v+' px', driftY:v=>v+' px', edgeW:v=>v+' px', fade:v=>Math.round(v*100)+'%', jitter:v=>Math.round(v*100)+'%', bw:v=>Math.round(v)+'', bh:v=>Math.round(v)+'', opacity:v=>Math.round(v*100)+'%', gw:v=>v+'', gh:v=>v+''};
+const CHECKS = ['stretchFree','angleSnap','followPath','showSrc','sampleComp','erase','stretchEdge','flip','snap','gridOn'];
+function bindUI(){
+  buildSeg('draw', DRAW_MODES); buildSeg('sample', SAMPLE_MODES); buildSeg('shape', SHAPES); buildSeg('gridView', GRID_VIEWS); buildSeg('tileLayout', TILE_LAYOUTS); buildSeg('tilePattern', TILE_PATTERNS);
+  Object.keys(RANGES).forEach(k => $(k).addEventListener('input', e => { S[k] = +e.target.value; if(k === 'edgeW' || k === 'fade' || k === 'jitter') S.stretchEdge = true; syncUI(); savePrefs(); }));
+  $('spacing').addEventListener('input', e => { S.spacing = spFromSlider(+e.target.value); syncUI(); savePrefs(); });
+  Object.entries(NUM).forEach(([k, c]) => {
+    const el = $(k + 'Out'); el.min = c.min; el.max = c.max; el.step = c.step; $(k + 'Unit').textContent = c.u;
+    const apply = (strict) => {
+      const v = parseFloat(el.value); if(!isFinite(v)) { if(strict) syncNum(k, true); return; }
+      if(!strict && (v < c.min || v > c.max)) return;
+      const cv = Math.min(c.max, Math.max(c.min, v));
+      S[k] = c.pct ? cv/100 : cv;
+      if(k === 'edgeW' || k === 'fade' || k === 'jitter') S.stretchEdge = true;
+      syncUI(); savePrefs(); if(strict) syncNum(k, true);
+    };
+    el.addEventListener('input', () => apply(false));
+    el.addEventListener('change', () => apply(true));
+    el.addEventListener('keydown', e => { if(e.key === 'Enter'){ apply(true); el.blur(); } if(e.key === 'Escape'){ syncNum(k, true); el.blur(); } });
+  });
+  $('btnTips').addEventListener('click', () => { S.tips = !S.tips; hideTip(); syncUI(); savePrefs(); toast(t(S.tips ? 'tipsOn' : 'tipsOff')); });
+  $('btnPsd').addEventListener('click', exportPSD);
+  $('btnPanel').addEventListener('click', () => { S.panelOpen = !S.panelOpen; savePrefs(); syncUI(); });
+  $('btnCapture').addEventListener('click', () => { captureNext = !captureNext; syncUI(); if(captureNext) toast(t('captureArmed')); });
+  $('btnPanel').dataset.tip = 'panel'; $('btnCapture').dataset.tip = 'capture';
+  bindTips();
+  bindPen();
+  CHECKS.forEach(k => $(k).addEventListener('change', e => { S[k] = e.target.checked; syncUI(); savePrefs(); }));
+  $('btnRot').addEventListener('click', () => { S.rot = (S.rot+1) % 4; syncUI(); savePrefs(); });
+  $('btnLoad').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+  $('btnSample').addEventListener('click', () => { loadSample(false); toast(t('sampleLoaded')); });
+  $('btnClearBuf').addEventListener('click', clearBuffer);
+  $('btnLang').addEventListener('click', toggleLang);
+  $('gridPill').addEventListener('click', toggleGrid);
+  $('gridPill').addEventListener('pointerdown', e => e.stopPropagation());
+  $('btnUndo').addEventListener('click', undo);
+  $('btnClear').addEventListener('click', clearCanvas);
+  $('btnExport').addEventListener('click', exportPNG);
+  $('btnSvg').addEventListener('click', exportSVG);
+  $('modalClose').addEventListener('click', () => { $('modal').hidden = true; });
+}
+function selectSlice(i){
+  if(i < 0 || i >= buffer.length) return;
+  bufIdx = i;
+  if(S.sample !== 'buffer'){ S.sample = 'buffer'; savePrefs(); }
+  renderBuffer(); syncUI(); toast(t('picked', i+1));
+}
+function removeSlice(i){
+  buffer.splice(i, 1);
+  if(bufIdx >= buffer.length) bufIdx = Math.max(0, buffer.length - 1);
+  else if(i < bufIdx) bufIdx--;
+  renderBuffer(); toast(t('removed', i+1));
+}
+function clearBuffer(){ buffer = []; bufIdx = 0; renderBuffer(); toast(t('stashCleared')); }
+function clearCanvas(){ pushUndo(); clearOut(); toast(t('canvasCleared')); }
+
+function toggleGrid(){ S.gridOn = !S.gridOn; toast(t(S.gridOn ? 'gridOn' : 'gridOff')); syncUI(); savePrefs(); }
+function syncUI(){
+  $('gridPill').setAttribute('aria-pressed', S.gridOn); $('gridPillTxt').textContent = t(S.gridOn ? 'gridPillOn' : 'gridPillOff');
+  $('gridStyle').classList.toggle('dim', !S.gridOn);
+  $('stretchGrp').hidden = S.draw !== 'stretch';
+  $('stampGrp').hidden = S.draw !== 'stamp';
+  $('tileGrp').hidden = S.draw !== 'tile';
+  $('penGrp').hidden = S.shape !== 'free'; if(S.shape === 'free') drawPen();
+  $('edgeSub').classList.toggle('dim', !S.stretchEdge);
+  $('angleSnapRow').hidden = !S.stretchFree;
+  document.querySelectorAll('.tabs').forEach(el => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', S[el.dataset.key] === b.dataset.val)));
+  Object.keys(RANGES).forEach(k => { const el = $(k); if(+el.value !== S[k]) el.value = S[k]; });
+  if(document.activeElement !== $('spacing')) $('spacing').value = spToSlider(S.spacing);
+  Object.keys(NUM).forEach(k => syncNum(k));
+  $('btnTips').setAttribute('aria-pressed', S.tips);
+  document.querySelector('.app').classList.toggle('nopanel', !S.panelOpen); $('btnPanel').setAttribute('aria-pressed', S.panelOpen);
+  $('btnCapture').setAttribute('aria-pressed', captureNext);
+  CHECKS.forEach(k => { $(k).checked = !!S[k]; });
+  $('rotTxt').textContent = `${t('rot')} ${S.rot*90}°`;
+  $('docChip').innerHTML = `${escapeHtml(isSample ? t('sampleDoc') : docName)}　${docW} × ${docH} px`;
+  updateStatus();
+}
+let lastStatus = '';
+function updateStatus(){
+  const fp = footprint();
+  const p = hover ? toDoc(hover.x, hover.y) : null;
+  const s = `<span class="dot${S.erase ? ' erase' : ''}"></span><b>${t(S.erase ? 'erase' : S.draw)}</b><span>${t(S.sample)}</span><span>${t(S.shape)} ${S.rot*90}°</span><span>${t('st_brush')} ${fp.w}×${fp.h}</span><span>${t('st_grid')} ${S.gw}×${S.gh}${S.snap ? ' · ' + t('st_snap') : ''}</span><span class="sp"></span>`
+    + (p ? `<span>X ${String(Math.round(p.x)).padStart(4,' ')}　Y ${String(Math.round(p.y)).padStart(4,' ')}</span>` : '');
+  if(s !== lastStatus){ $('statusChip').innerHTML = s; lastStatus = s; }
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function renderBuffer(){
+  const el = $('buf'); el.textContent = '';
+  $('bufCount').textContent = `${buffer.length} / ${BUF_MAX}`;
+  if(!buffer.length){ const s = document.createElement('span'); s.className = 'empty'; s.textContent = t('emptyStash'); el.appendChild(s); return; }
+  buffer.forEach((sl,i) => {
+    const c = mk(80,80), g = c.getContext('2d');
+    const k = Math.max(80/sl.sw, 80/sl.sh);
+    g.drawImage(sl.c, sl.sx, sl.sy, sl.sw, sl.sh, (80-sl.sw*k)/2, (80-sl.sh*k)/2, sl.sw*k, sl.sh*k);
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'slot' + (i === bufIdx ? ' sel' : '');
+    b.title = t('sliceTitle', i+1, sl.sw, sl.sh);
+    b.setAttribute('aria-label', t('slice', i+1)); b.setAttribute('aria-pressed', i === bufIdx);
+    const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
+    b.append(c, n);
+    b.addEventListener('click', () => selectSlice(i));
+    b.addEventListener('contextmenu', e => { e.preventDefault(); removeSlice(i); });
+    el.appendChild(b);
+  });
+}
+
+/* ---------- input ---------- */
+function localXY(e){ const b = cnv.elt.getBoundingClientRect(); return {x:e.clientX - b.left, y:e.clientY - b.top}; }
+function bindCanvas(){
+  const el = cnv.elt;
+  el.addEventListener('contextmenu', e => e.preventDefault());
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); el.setPointerCapture(e.pointerId);
+    const l = localXY(e), p = toDoc(l.x, l.y); hover = l;
+    if(e.pointerType === 'touch'){
+      touches.set(e.pointerId, l);
+      if(touches.size === 2){
+        // second finger: cancel the stroke the first finger started and pinch-resize the brush instead
+        if(stroke){ stroke = null; const u = undoStack.pop(); if(u){ const g = outCtx(); g.clearRect(0,0,docW,docH); g.drawImage(u.c,0,0); ops = u.ops; } }
+        const [a, b] = [...touches.values()];
+        pinch = {d:Math.hypot(a.x - b.x, a.y - b.y) || 1, bw:S.bw, bh:S.bh, cx:(a.x + b.x)/2, cy:(a.y + b.y)/2};
+        return;
+      }
+      if(touches.size > 2) return;
+    }
+    if(captureNext && e.button === 0){ captureNext = false; capture(p); syncUI(); return; }
+    if(e.button === 2){ resizing = {x:l.x, y:l.y, bw:S.bw, bh:S.bh}; return; }
+    if(e.button !== 0) return;
+    if(e.shiftKey){ capture(p); return; }
+    beginStroke(p);
+  });
+  el.addEventListener('pointermove', e => {
+    const l = localXY(e);
+    if(e.pointerType === 'touch' && touches.has(e.pointerId)) touches.set(e.pointerId, l);
+    if(pinch){
+      if(touches.size >= 2){ const [a, b] = [...touches.values()], k = Math.hypot(a.x - b.x, a.y - b.y) / pinch.d;
+        S.bw = clampN(Math.round(pinch.bw * k), 4, 2000); S.bh = clampN(Math.round(pinch.bh * k), 4, 2000); hover = {x:pinch.cx, y:pinch.cy}; syncUI(); }
+      return;
+    }
+    hover = l;
+    if(resizing){
+      S.bw = clampN(Math.round(resizing.bw + (l.x - resizing.x)/view.s), 4, 2000);
+      S.bh = clampN(Math.round(resizing.bh + (l.y - resizing.y)/view.s), 4, 2000);
+      syncUI(); return;
+    }
+    if(stroke){ stroke.free = e.altKey; dragStroke(toDoc(l.x, l.y)); }
+  });
+  const up = e => {
+    if(e.pointerType === 'touch'){ touches.delete(e.pointerId); if(pinch){ if(touches.size === 0){ pinch = null; savePrefs(); } return; } }
+    if(resizing){ resizing = null; savePrefs(); }
+    if(stroke){ const l = localXY(e); endStroke(toDoc(l.x, l.y), e.altKey); }
+  };
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('pointerleave', e => { if(!stroke && !resizing) hover = null; });
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    const d = e.deltaY || e.deltaX, f = Math.exp(-d * 0.0015);
+    if(!e.altKey) S.bw = clampN(Math.round(S.bw * f), 4, 2000);
+    if(!e.shiftKey) S.bh = clampN(Math.round(S.bh * f), 4, 2000);
+    syncUI(); savePrefs();
+  }, {passive:false});
+}
+function bindKeys(){
+  document.addEventListener('keydown', e => {
+    if(e.target.closest && e.target.closest('input,select,textarea')) return;
+    const k = e.key.toLowerCase();
+    if((e.metaKey || e.ctrlKey) && k === 'z'){ e.preventDefault(); undo(); return; }
+    if(e.metaKey || e.ctrlKey || e.altKey) return;
+    const cyc = (key, list) => { const i = list.findIndex(x => x[0] === S[key]); S[key] = list[(i+1) % list.length][0]; toast(t(S[key])); };
+    const step = e.shiftKey ? 1 : 4;
+    let handled = true;
+    switch(k){
+      case 'm': cyc('draw', DRAW_MODES); break;
+      case 's': cyc('sample', SAMPLE_MODES); break;
+      case 't': cyc('shape', SHAPES); break;
+      case 'a': clearBuffer(); break;
+      case 'e': S.erase = !S.erase; toast(t(S.erase ? 'eraseOn' : 'eraseOff')); break;
+      case 'r': S.rot = (S.rot+1) % 4; break;
+      case 'i': S.showSrc = !S.showSrc; break;
+      case 'c': clearCanvas(); break;
+      case 'd': exportPNG(); break;
+      case 'v': exportSVG(); break;
+      case 'p': exportPSD(); break;
+      case 'g': S.snap = !S.snap; toast(t(S.snap ? 'snapOn' : 'snapOff')); break;
+      case 'h': toggleGrid(); break;
+      case '[': S.bw = Math.max(4, Math.round(S.bw/1.15)); S.bh = Math.max(4, Math.round(S.bh/1.15)); break;
+      case ']': S.bw = Math.min(2000, Math.round(S.bw*1.15)); S.bh = Math.min(2000, Math.round(S.bh*1.15)); break;
+      case 'arrowleft': S.gw = Math.max(4, S.gw - step); break;
+      case 'arrowright': S.gw = Math.min(400, S.gw + step); break;
+      case 'arrowup': S.gh = Math.min(400, S.gh + step); break;
+      case 'arrowdown': S.gh = Math.max(4, S.gh - step); break;
+      default:
+        if(/^[1-9]$/.test(k) && buffer.length){ selectSlice(+k - 1); }
+        else handled = false;
+    }
+    if(handled){ e.preventDefault(); syncUI(); savePrefs(); }
+  });
+  window.addEventListener('dragover', e => { e.preventDefault(); stageEl.classList.add('drop'); });
+  window.addEventListener('dragleave', e => { if(!e.relatedTarget) stageEl.classList.remove('drop'); });
+  window.addEventListener('drop', e => { e.preventDefault(); stageEl.classList.remove('drop'); loadFile(e.dataTransfer.files[0]); });
+  window.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/')); if(f) loadFile(f); });
+}
+
+/* ---------- p5 ---------- */
+function setup(){
+  stageEl = $('stage');
+  cnv = createCanvas(Math.max(10, stageEl.clientWidth), Math.max(10, stageEl.clientHeight));
+  cnv.parent(stageEl);
+  pixelDensity(Math.min(2, window.devicePixelRatio || 1));
+  const pc = mk(16,16), pg = pc.getContext('2d');
+  pg.fillStyle = '#ffffff'; pg.fillRect(0,0,16,16); pg.fillStyle = '#ececea'; pg.fillRect(0,0,8,8); pg.fillRect(8,8,8,8);
+  checker = drawingContext.createPattern(pc, 'repeat');
+  bindUI(); bindCanvas(); bindKeys();
+  new ResizeObserver(() => { resizeCanvas(Math.max(10, stageEl.clientWidth), Math.max(10, stageEl.clientHeight)); fitView(); }).observe(stageEl);
+  loadSample(true); applyLang();
+  const ready = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('700 100px "Instrument Sans"'), document.fonts.load('600 30px "Instrument Sans"'), document.fonts.load('400 27px "Instrument Sans"'), document.fonts.load('italic 400 100px "Instrument Serif"'), document.fonts.load('400 27px "Noto Sans TC"', '從任何一張圖')]) : Promise.resolve();
+  ready.then(() => { if(isSample && undoStack.length === 0) loadSample(true); }).catch(()=>{});
+}
+
+function drawRulers(ctx){
+  // screen-space px rulers along the sheet's top and left edges
+  const s = view.s, steps = [10,25,50,100,200,250,500,1000,2000];
+  const major = steps.find(v => v*s >= 70) || 2000, minor = major/5;
+  ctx.save();
+  ctx.font = '500 9.5px "JetBrains Mono", monospace'; ctx.fillStyle = '#9a9a96'; ctx.strokeStyle = '#b8b8b4'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let x = 0; x <= docW + 0.5; x += minor){
+    const sx = Math.round(view.ox + x*s) + .5, isMaj = Math.abs(x/major - Math.round(x/major)) < 1e-6;
+    ctx.moveTo(sx, view.oy - 4); ctx.lineTo(sx, view.oy - (isMaj ? 11 : 6));
+    if(isMaj) ctx.fillText(String(Math.round(x)), sx + 3, view.oy - 6);
+  }
+  for(let y = 0; y <= docH + 0.5; y += minor){
+    const sy = Math.round(view.oy + y*s) + .5, isMaj = Math.abs(y/major - Math.round(y/major)) < 1e-6;
+    ctx.moveTo(view.ox - 4, sy); ctx.lineTo(view.ox - (isMaj ? 11 : 6), sy);
+    if(isMaj && y > 0){ ctx.save(); ctx.translate(view.ox - 6, sy - 3); ctx.rotate(-Math.PI/2); ctx.fillText(String(Math.round(y)), 0, 0); ctx.restore(); }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function draw(){
+  clear();
+  const ctx = drawingContext, s = view.s;
+  drawRulers(ctx);
+  ctx.save();
+  ctx.translate(view.ox, view.oy); ctx.scale(s, s);
+  ctx.shadowColor = 'rgba(20,20,20,.10)'; ctx.shadowBlur = 18/s; ctx.shadowOffsetY = 2/s;
+  ctx.fillStyle = S.showSrc ? '#ffffff' : checker; ctx.fillRect(0, 0, docW, docH);
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0; ctx.shadowColor = 'transparent';
+  if(S.showSrc) ctx.drawImage(srcC, 0, 0);
+  ctx.drawImage(outC, 0, 0);
+
+  if(stroke && hover){
+    const p = toDoc(hover.x, hover.y);
+    if(stroke.mode === 'stretch') drawStretch(ctx, p, stroke.free);
+    if(stroke.mode === 'tile'){ drawTiles(ctx, p); const R = tileRect(p); ctx.lineWidth = 1/s; ctx.strokeStyle = '#ff3d9a'; ctx.strokeRect(R.x, R.y, R.w, R.h); }
+  }
+
+  if(S.gridOn && S.gridView === 'all'){
+    ctx.save(); ctx.beginPath();
+    for(let x = S.gw; x < docW; x += S.gw){ ctx.moveTo(x, 0); ctx.lineTo(x, docH); }
+    for(let y = S.gh; y < docH; y += S.gh){ ctx.moveTo(0, y); ctx.lineTo(docW, y); }
+    ctx.globalCompositeOperation = 'difference'; ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1/s; ctx.stroke();
+    ctx.restore();
+  } else if(S.gridOn && S.gridView === 'near' && hover && !stroke){
+    // small crosses at nearby grid intersections, fading out with distance
+    const p = toDoc(hover.x, hover.y), rad = Math.max(S.gw, S.gh) * 4, arm = 4/s;
+    const x0 = Math.max(0, Math.floor((p.x - rad)/S.gw)*S.gw), x1 = Math.min(docW, p.x + rad);
+    const y0 = Math.max(0, Math.floor((p.y - rad)/S.gh)*S.gh), y1 = Math.min(docH, p.y + rad);
+    ctx.save(); ctx.globalCompositeOperation = 'difference'; ctx.lineWidth = 1/s;
+    for(let x = x0; x <= x1; x += S.gw) for(let y = y0; y <= y1; y += S.gh){
+      const a = 1 - Math.hypot(x - p.x, y - p.y)/rad; if(a <= 0) continue;
+      ctx.strokeStyle = `rgba(255,255,255,${(a*.75).toFixed(3)})`;
+      ctx.beginPath(); ctx.moveTo(x - arm, y); ctx.lineTo(x + arm, y); ctx.moveTo(x, y - arm); ctx.lineTo(x, y + arm); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  if(hover){
+    const anchor = resizing ? {x:resizing.x, y:resizing.y} : hover;
+    const p = toDoc(anchor.x, anchor.y), r = rectAt(p.x, p.y);
+    const odd = S.rot % 2, dw = odd ? r.h : r.w, dh = odd ? r.w : r.h;
+    ctx.save();
+    ctx.translate(r.x + r.w/2, r.y + r.h/2); ctx.rotate(S.rot*Math.PI/2);
+    shapePath(ctx, S.shape, dw, dh, S.customPath);
+    if(S.sample === 'buffer' && buffer.length && !S.erase && !stroke){
+      const sl = buffer[Math.min(bufIdx, buffer.length-1)];
+      ctx.save(); ctx.clip(); ctx.globalAlpha = .65; ctx.drawImage(sl.c, sl.sx, sl.sy, sl.sw, sl.sh, -dw/2, -dh/2, dw, dh); ctx.restore();
+    }
+    ctx.lineWidth = 3.5/s; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.stroke();
+    ctx.setLineDash(S.erase ? [5/s, 4/s] : []);
+    ctx.lineWidth = 1.25/s; ctx.strokeStyle = S.erase ? '#43423f' : '#ff3d9a'; ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(-5/s, 0); ctx.lineTo(5/s, 0); ctx.moveTo(0, -5/s); ctx.lineTo(0, 5/s); ctx.stroke();
+    ctx.restore();
+  }
+
+  if(flash){
+    const a = 1 - (performance.now() - flash.t)/500;
+    if(a <= 0) flash = null;
+    else { ctx.fillStyle = `rgba(255,61,154,${a*.35})`; ctx.fillRect(flash.r.x, flash.r.y, flash.r.w, flash.r.h); }
+  }
+  ctx.restore();
+  updateStatus();
+}
+</script>
+
+</body>
+</html>
