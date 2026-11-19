@@ -1418,5 +1418,20 @@ kick();setTimeout(()=>toast('把游標移到畫面上，網格會被游標吸聚
 })();
 </script>
 
+
+<!-- roubert-nav: 回到 Tools／主網站的小選單（貼在畫面左側中間，滑鼠移上去才展開）-->
+<style>
+#roubert-nav{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:2147483647;display:flex;align-items:stretch;font:11px/1 "Helvetica Neue",Helvetica,"PingFang TC",sans-serif;letter-spacing:.06em;text-transform:uppercase}
+#roubert-nav .tab{all:unset;cursor:pointer;background:#111;color:#fff;width:18px;padding:12px 0;display:flex;align-items:center;justify-content:center;border-radius:0 3px 3px 0;writing-mode:vertical-rl;font-size:10px;opacity:.55;transition:opacity .2s}
+#roubert-nav .links{display:none;flex-direction:column;background:#111;border-radius:0 3px 3px 0}
+#roubert-nav .links a{color:#fff;text-decoration:none;padding:9px 12px;white-space:nowrap}
+#roubert-nav .links a:hover{background:#333}
+#roubert-nav:hover .tab,#roubert-nav:focus-within .tab{display:none}
+#roubert-nav:hover .links,#roubert-nav:focus-within .links{display:flex}
+</style>
+<nav id="roubert-nav" aria-label="Roubert">
+  <button class="tab" type="button" aria-label="選單">MENU</button>
+  <div class="links"><a href="../">← Tools</a><a href="https://robertlin0312.github.io/">Roubert</a></div>
+</nav>
 </body>
 </html>
